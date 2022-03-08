@@ -1,0 +1,79 @@
+# Example Configuration for gitea-group-sync
+debug: false
+
+# Gitea Configuration
+gitea:
+  base_url: "https://gitea.example.com"
+  token:
+    - "exampleToken123456789"
+
+# LDAP Configuration
+ldap:
+  url: "ldap.example.com"
+  port: 636
+  use_tls: true
+  allow_insecure_tls: false
+
+  # BindDN is optional, if unset we will do an anonymous bind
+  bind_dn: "cn=admin,DC=ldap,DC=example,DC=com"
+  bind_password: "SecretPassword12345"
+
+  user_search_base: 'ou=users,DC=ldap,DC=example,DC=com'
+  user_filter: '(&(objectClass=user)(memberOf=*))'
+  user_identity_attribute: "sAMAccountName"
+  user_fullname: "cn"    # can be changed to "sn" if needed
+
+  # These groups will be mapped as Organizations in Gitea
+  group_search_base: 'ou=groups,DC=ldap,DC=example,DC=com'
+  group_filter: '(&(objectClass=group))'
+
+  # These groups will be mapped as Teams in Gitea
+  # In this example all groups, which has a memberOf attribute will be determined as subgroups, because they are member
+  # of some other groups.
+  subgroup_search_base: 'ou=groups,DC=ldap,DC=example,DC=com'
+  subgroup_filter: '(&(objectClass=group)(memberOf=*))'
+
+  # List of groups which will be excluded from the sync. (Gitea Organizations)
+  exclude_groups:
+    - "Admins"
+
+  # Exclude groups from the sync based on Regular Expression. (Gitea Organizations)
+  exclude_groups_regex: ""
+
+  # List of subgroups which will be excluded from the sync. (Gitea Teams)
+  exclude_subgroups: []
+
+  # Exclude subgroups from the sync based on Regular Expression. (Gitea Teams)
+  exclude_subgroups_regex: ""
+
+cron_timer: '@every 1m'
+
+sync_config:
+  # If CreateGroups is set to true, the process will create Organizations and Teams in Gitea.
+  create_groups: true
+
+  # Set FullSync to false, if you only want to create new groups. If you set this to true, the process is going to delete
+  # the missing organizations/teams. Use with caution.
+  full_sync: true
+
+  # Default settings for creating Organizations and Teams in Gitea.
+  defaults:
+    organization:
+      repo_admin_change_team_access: false
+      visibility: "private"
+    team:
+      can_create_org_repo: false
+      includes_all_repositories: false
+      permission: "read"
+      units: |
+        [
+        "repo.code",
+        "repo.issues",
+        "repo.ext_issues",
+        "repo.wiki",
+        "repo.pulls",
+        "repo.releases",
+        "repo.projects",
+        "repo.ext_wiki"
+        ]
+      units_map: '{"repo.code":"write","repo.issues":"write","repo.ext_issues":"none","repo.wiki":"write","repo.pulls":"owner","repo.releases":"none","repo.projects":"none","repo.ext_wiki":"none"}'

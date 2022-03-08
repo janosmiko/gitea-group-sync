@@ -1,19 +1,20 @@
-FROM golang:1.14-alpine3.12 AS build-env
+FROM golang:1.17.8-bullseye AS build
 
-#Build deps
-RUN apk --no-cache add build-base git
+WORKDIR /go/src/github.com/janosmiko/gitea-group-sync/
 
-#Setup 
-COPY . /src/gitea-group-sync
-WORKDIR /src/gitea-group-sync
+COPY go.mod go.sum ./
 
-RUN go get -d -v && go build
+RUN go mod download -x
 
-# Final
-FROM alpine:3.12
+COPY . ./
 
-COPY --from=build-env /src/gitea-group-sync/gitea-group-sync /app/gitea-group-sync/gitea-group-sync
+RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o gitea-group-sync .
 
-RUN ln -s /app/gitea-group-sync/gitea-group-sync /usr/local/bin/gitea-group-sync
+FROM debian:bullseye-slim
 
-ENTRYPOINT ["/usr/local/bin/gitea-group-sync"]
+COPY --from=build /go/src/github.com/janosmiko/gitea-group-sync/gitea-group-sync /usr/bin/gitea-group-sync
+
+RUN apt-get update && apt-get install -y ca-certificates \
+    && rm -fr /var/cache/apt/
+
+ENTRYPOINT ["/usr/bin/gitea-group-sync"]

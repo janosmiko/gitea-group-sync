@@ -1,61 +1,86 @@
-# Gitea Group Sync
+# Gitea Group Sync from LDAP
 
-This application adds users to appropriate teams in Gitea based on group membership information in LDAP.
+This application is designed to sync LDAP groups and user membership to Gitea.
 
-Docker image available at [ghcr.io/gitea-group-sync/gitea-group-sync](https://github.com/gitea-group-sync/gitea-group-sync/pkgs/container/gitea-group-sync).
+It can do the following:
 
-## Installation instructions
+- **Create** (and optionally delete) **Gitea Organizations** based on **LDAP groups**.
+- **Create** (and optionally delete) **Gitea Teams** inside Organizations based on **LDAP subgroups**.
+- **Attach** existing **Gitea Users** to appropriate **Gitea Teams** based on group membership information in LDAP.
 
-You must have configured your LDAP with gitea
+**The application is not going to sync users from LDAP to Gitea as Gitea provides a solution for that.**
 
-Here I will give the settings for a simple [LDAP](https://github.com/rroemhild/docker-test-openldap), you can configure by changing the code as you like
+Docker image available
+at [ghcr.io/janosmiko/gitea-group-sync](https://github.com/janosmiko/gitea-group-sync/pkgs/container/gitea-group-sync).
 
-If you configured the [Gitea](https://hub.docker.com/r/gitea/gitea) <=> [LDAP](https://github.com/rroemhild/docker-test-openldap) connection correctly, you should have users
+## Usage
 
-![](images/Image1.png)
+### Docker Compose
 
-You need to create Manage Access Tokens and add key to run.sh or docker-compose.yml the configuration file
-
-##### Configuration: 
-There are two ways to configure the application. Via YAML Configuration File or Enviroment Variables. 
-- See `run.sh` for an example using the enviroment Variables. 
-- Use `./gitea-group-sync --config="config.yaml"` with the example Config File for the YAML Variant.
-
-##### Gitea Tokens
-The application supports several keys, since to add people to the group you must be the owner of the organization.
-
-
-![](images/Image2.png)
-
-#### create organizations in gitea
-
-![](images/Image3.png)
-
-#### add the appropriate groups in our case: ship_crew, admin_staff
-
-![](images/Image4.png)
-
-### Usage
-
-
-REP_TIME: '@every 1m'  -- you can change the synchronization time of groups 
-
+Configure your settings in `docker-compose.yml` or copy `config.yaml.sample` as `config.yaml` and fill the settings (and uncomment the volume mount in docker-compose.yml`.
 
 ```
-docker-compose up
+docker-compose up -d
 ```
 
-or
+### Kubernetes
+
+Modify the values in [deploy/secret.yaml](deploy/secret.yaml) and [deploy/job.yaml](deploy/job.yaml) and apply them to Kubernetes.
 
 ```
-./run.sh
+kubectl apply -f deploy/secret.yaml
+kubectl apply -f deploy/job.yaml
 ```
-![](images/Image8.png)
+
+## Configuration Options
+
+You can configure the application using a `yaml` config file (find a sample in this repository) or using Environment
+Variables.
+
+Available Environment Variables (find example values in [config.yaml.sample](config.yaml.sample)):
+
+| Variable                       | Description                                                | Default            |
+|--------------------------------|------------------------------------------------------------|--------------------|
+| `DEBUG`                        | Enable debug mode                                          | `false`            |
+| `GITEA_BASE_URL`               | Gitea baseURL in `https://user@gitea.com` format.          | `""`               |
+| `GITEA_TOKEN`                  | Gitea admin user token                                     | `""`               |
+| `LDAP_URL`                     | LDAP connection URL                                        | `""`               |
+| `LDAP_PORT`                    | LDAP connection port                                       | `389`              |
+| `LDAP_USE_TLS`                 | Enable TLS connection for LDAP                             | `true`             |
+| `LDAP_ALLOW_INSECURE_TLS`      | Allow insecure TLS connections (disable cert verification) | `false`            |
+| `LDAP_BIND_DN`                 | LDAP Bind DN (or username)                                 | `""`               |
+| `LDAP_BIND_PASSWORD`           | LDAP Bind Password                                         | `""`               |
+| `LDAP_USER_SEARCH_BASE`        | LDAP User Search Base                                      | `""`               |
+| `LDAP_USER_FILTER`             | LDAP User Filter                                           | `""`               |
+| `LDAP_USER_IDENTITY_ATTRIBUTE` | LDAP attribute to match Gitea User                         | `"sAMAccountName"` |
+| `LDAP_USER_FULLNAME`           | LDAP attribute for Gitea User Fullname                     | `"cn"`             |
+| `LDAP_GROUP_SEARCH_BASE`       | LDAP Group Search Base (Gitea Organizations)               | `""`               |
+| `LDAP_GROUP_FILTER`            | LDAP Group Filter                                          | `""`               |
+| `LDAP_SUBGROUP_SEARCH_BASE`    | LDAP Subgroup Search Base (Gitea Teams)                    | `""`               |
+| `LDAP_SUBGROUP_FILTER`         | LDAP Subgroup filter                                       | `""`               |
+| `LDAP_EXCLUDE_GROUPS`          | Exclude groups from sync (separated by whitespace)         | `""`               |
+| `LDAP_EXCLUDE_GROUPS_REGEX`    | Exclude groups from sync (regular expression)              | `""`               |
+| `LDAP_EXCLUDE_SUBGROUPS`       | Exclude subgroups from sync (separated by whitespace)      | `""`               |
+| `LDAP_EXCLUDE_SUBGROUPS_REGEX` | Exclude groups from sync (regular expression)              | `""`               |
+| `CRON_TIMER`                   | Configure the schedule of the sync (cron format)           | `"@every 1m"`      |
+| `SYNC_CONFIG_CREATE_GROUPS`    | Create non-existing groups in Gitea.                       | `true`             |
+| `SYNC_CONFIG_FULL_SYNC`        | Delete groups from Gitea if they are not existing in LDAP  | `false`            |
 
 
-### Realise
-![](images/Image5.png)
+Additional settings for creating Organizations and Teams in Gitea:
+- `SYNC_CONFIG_DEFAULTS_ORGANIZATION_REPO_ADMIN_CHANGE_TEAM_ACCESS`
+- `SYNC_CONFIG_DEFAULTS_ORGANIZATION_VISIBILITY`
+- `SYNC_CONFIG_DEFAULTS_TEAM_CAN_CREATE_ORG_REPO`
+- `SYNC_CONFIG_DEFAULTS_TEAM_INCLUDES_ALL_REPOSITORIES`
+- `SYNC_CONFIG_DEFAULTS_TEAM_PERMISSION`
+- `SYNC_CONFIG_DEFAULTS_TEAM_UNITS`
+- `SYNC_CONFIG_DEFAULTS_TEAM_UNITS_MAP`
 
-![](images/Image6.png)
+# License
 
-![](images/Image7.png)
+This work is licensed under the MIT license. See LICENSE file for details.
+
+# Acknowledgement
+
+This project is based on the idea by [Gitea Group Sync by TWS Inc](https://github.com/gitea-group-sync/gitea-group-sync)
+.

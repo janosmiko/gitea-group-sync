@@ -2,7 +2,7 @@ name: Docker Publish
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   docker-publish:
@@ -22,9 +22,9 @@ jobs:
     - name: Build
       run: |-
         docker build \
-          --tag "ghcr.io/gitea-group-sync/gitea-group-sync:master" \
+          --tag "ghcr.io/janosmiko/gitea-group-sync:latest" \
           .
 
     - name: Publish
       run: |-
-        docker push "ghcr.io/gitea-group-sync/gitea-group-sync:master"
+        docker push "ghcr.io/janosmiko/gitea-group-sync:latest"

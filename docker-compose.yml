@@ -3,14 +3,25 @@ services:
   group-sync:
     container_name: gitea-group-sync
     build: .
-    image: ghcr.io/gitea-group-sync/gitea-group-sync
+    image: ghcr.io/janosmiko/gitea-group-sync
     environment:
-      GITEA_TOKEN: c00c810bb668c63ce7cd8057411d2f560eac469c
-      GITEA_URL: http://192.168.2.2:3000
-      LDAP_URL: 192.168.2.2
-      LDAP_TLS_PORT: 636
-      BIND_DN: cn=admin,dc=planetexpress,dc=com
-      BIND_PASSWORD: GoodNewsEveryone
-      LDAP_FILTER: (&(objectClass=person)(memberOf=cn=%s,ou=people,dc=planetexpress,dc=com))
-      LDAP_USER_SEARCH_BASE: 'ou=people,dc=planetexpress,dc=com'
-      REP_TIME: '@every 1m'
+      DEBUG: "false"
+      GITEA_TOKEN: 123456789
+      GITEA_BASE_URL: https://gitea.example.com
+      LDAP_URL: ldap.example.com
+      LDAP_PORT: 636
+      LDAP_USE_TLS: "true"
+      LDAP_ALLOW_INSECURE_TLS: "true"
+      LDAP_BIND_DN: cn=admin,dc=ldap,dc=example,dc=com
+      LDAP_BIND_PASSWORD: SuperSecretLdapPassword123
+      LDAP_USER_SEARCH_BASE: 'ou=users,dc=ldap,dc=example,dc=com'
+      LDAP_USER_FILTER: '(&(objectClass=user)(memberOf=*))'
+      LDAP_GROUP_SEARCH_BASE: 'ou=groups,dc=ldap,dc=example,dc=com'
+      LDAP_GROUP_FILTER: '(&(objectClass=group))'
+      LDAP_SUBGROUP_SEARCH_BASE: 'ou=groups,DC=ldap,DC=example,DC=com'
+      LDAP_SUBGROUP_FILTER: '(&(objectClass=group)(memberOf=*))'
+      CRON_TIMER: '@every 1m'
+      SYNC_CONFIG_CREATE_GROUPS: "true"
+      SYNC_CONFIG_FULL_SYNC: "true"
+#    volumes:
+#      - ./config.yaml:/etc/gitea-group-sync/config.yaml

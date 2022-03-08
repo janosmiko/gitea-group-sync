@@ -1,0 +1,82 @@
+run:
+  concurrency: 8
+  tests: true
+  skip-files:
+    - .golangci.yml
+  allow-parallel-runners: true
+
+
+linters:
+  # please, do not use `enable-all`: it's deprecated and will be removed soon.
+  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
+  disable-all: true
+  enable:
+    - asciicheck
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - errcheck
+    - exhaustive
+    - exportloopref
+#    - funlen
+    - gochecknoglobals
+    - gochecknoinits
+    - gocognit
+    - goconst
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - goerr113
+    - gofmt
+    - goimports
+    - gomnd
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - misspell
+    - nakedret
+    - nestif
+    - noctx
+    - nolintlint
+    - prealloc
+    - revive
+    - rowserrcheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - testpackage
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+    #    - wsl
+    # don't enable:
+    # bug:
+    # https://github.com/golangci/golangci-lint/issues/967
+    #    - dupl
+    # deprecated
+    #    - scopelint
+    # deprecated
+    #    - golint
+    # deprecated
+    #    - interfacer
+    # deprecated
+    #    - maligned
+
+  #issues:
+  #  exclude-rules:
+  #    - linters:
+  #        - stylecheck
+  #      text: "ST1001:"
+
+linters-settings:
+  wsl:
+    allow-separated-leading-comment: true
+    allow-trailing-comment: true
