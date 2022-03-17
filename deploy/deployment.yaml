@@ -1,14 +1,23 @@
-apiVersion: batch/v1
-kind: Job
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: gitea-group-sync
 spec:
+  replicas: 1
+  strategy:
+    type: Recreate
   template:
+    metadata:
+      labels:
+        app: gitea-group-sync
     spec:
       containers:
         - name: gitea-group-sync
           image: ghcr.io/janosmiko/gitea-group-sync:latest
+          imagePullPolicy: Always
           env:
+            - name: DEBUG
+              value: "true"
             - name: GITEA_BASE_URL
               value: https://user@gitea.example.com
             - name: GITEA_TOKEN
@@ -55,13 +64,19 @@ spec:
               value: ''
             - name: LDAP_EXCLUDE_SUBGROUPS_REGEX
               value: ''
+            - name: LDAP_TRIM_PARENT_NAME
+              value: "false"
+            - name: LDAP_SUBGROUP_SEPARATOR
+              value: "/"
             - name: CRON_TIMER
               value: '@every 1m'
             - name: SYNC_CONFIG_CREATE_GROUPS
               value: 'true'
             - name: SYNC_CONFIG_FULL_SYNC
               value: 'false'
-      restartPolicy: OnFailure
-  backoffLimit: 6
-  completions: 1
-  parallelism: 1
+  selector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - gitea-group-sync

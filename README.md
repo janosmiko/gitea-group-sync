@@ -29,7 +29,7 @@ Modify the values in [deploy/secret.yaml](deploy/secret.yaml) and [deploy/job.ya
 
 ```
 kubectl apply -f deploy/secret.yaml
-kubectl apply -f deploy/job.yaml
+kubectl apply -f deploy/deployment.yaml
 ```
 
 ## Configuration Options
