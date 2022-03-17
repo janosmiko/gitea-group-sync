@@ -46,14 +46,20 @@ ldap:
   # Exclude subgroups from the sync based on Regular Expression. (Gitea Teams)
   exclude_subgroups_regex: ""
 
+  # Set to true if the subgroup contains the parent group's name. Eg.: org1/team1
+  # If set to true the part before the separator will be removed. Eg.: org1/team1 team will be synced to
+  # `org1` organization using name `team1`.
+  trim_parent_name: false
+  subgroup_separator: "/"
+
 cron_timer: '@every 1m'
 
 sync_config:
   # If CreateGroups is set to true, the process will create Organizations and Teams in Gitea.
   create_groups: true
 
-  # Set FullSync to false, if you only want to create new groups. If you set this to true, the process is going to delete
-  # the missing organizations/teams. Use with caution.
+  # Set FullSync to false, if you only want to create new groups. If you set this to true, the process is going to
+  # delete the missing organizations/teams. Use with caution.
   full_sync: true
 
   # Default settings for creating Organizations and Teams in Gitea.

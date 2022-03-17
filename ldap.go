@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"gopkg.in/ldap.v3"
 )
@@ -132,8 +133,15 @@ func (c *LDAP) getLDAPDirectory() *Directory {
 					}
 				}
 
-				dir.Organizations[o.GetAttributeValue("cn")].Teams[t.GetAttributeValue("cn")] = &LDAPTeam{
-					Name:  t.GetAttributeValue("cn"),
+				name := t.GetAttributeValue("cn")
+
+				if viper.GetBool("ldap.trim_parent_name") {
+					sep := viper.GetString("ldap.subgroup_separator")
+					name = name[strings.Index(name, sep)+len(sep):]
+				}
+
+				dir.Organizations[o.GetAttributeValue("cn")].Teams[name] = &LDAPTeam{
+					Name:  name,
 					Entry: t,
 					Users: users,
 				}

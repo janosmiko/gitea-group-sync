@@ -62,6 +62,8 @@ Available Environment Variables (find example values in [config.yaml.sample](con
 | `LDAP_EXCLUDE_GROUPS_REGEX`    | Exclude groups from sync (regular expression)              | `""`               |
 | `LDAP_EXCLUDE_SUBGROUPS`       | Exclude subgroups from sync (separated by whitespace)      | `""`               |
 | `LDAP_EXCLUDE_SUBGROUPS_REGEX` | Exclude groups from sync (regular expression)              | `""`               |
+| `LDAP_TRIM_PARENT_NAME`        | Trim parent name from subgroup name                        | `false`            |
+| `LDAP_SUBGROUP_SEPARATOR`      | Trim parent name from subgroup name by this separator      | `"/"`              |
 | `CRON_TIMER`                   | Configure the schedule of the sync (cron format)           | `"@every 1m"`      |
 | `SYNC_CONFIG_CREATE_GROUPS`    | Create non-existing groups in Gitea.                       | `true`             |
 | `SYNC_CONFIG_FULL_SYNC`        | Delete groups from Gitea if they are not existing in LDAP  | `false`            |
