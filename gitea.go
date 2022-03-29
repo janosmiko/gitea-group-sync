@@ -1,347 +1,275 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
-	"fmt"
-	"io"
-	"io/ioutil"
-	"net/http"
-	"net/http/httputil"
 	urlpkg "net/url"
 	"strings"
-	"time"
 
+	"code.gitea.io/sdk/gitea"
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
 
-func (c *GiteaClient) AddUsersToTeam(users []GiteaAccount, team int) bool {
-	ctx := context.Background()
-	for i := 0; i < len(users); i++ {
-		fullUsername := urlpkg.PathEscape(users[i].FullName)
-		c.Command = "/api/v1/users/search?q=" + fullUsername + "&access_token="
-		foundUsers := c.RequestSearchResults()
+func NewGiteaClient() (*GiteaClient, error) {
+	var gtc *gitea.Client
+	var err error
 
-		for j := 0; j < len(foundUsers.Data); j++ {
-			if strings.EqualFold(users[i].Login, foundUsers.Data[j].Login) {
-				c.Command = "/api/v1/teams/" + fmt.Sprintf(
-					"%d", team,
-				) + "/members/" + foundUsers.Data[j].Login + "?access_token="
-				errs := c.RequestPut(ctx)
-				if len(errs) > 0 {
-					zap.S().Info(
-						"Error (GiteaTeam does not exist or Not Found GiteaUser) :",
-						parseJSON(errs).(map[string]interface{})["message"],
-					)
+	u, err := urlpkg.Parse(viper.GetString("GITEA_BASE_URL"))
+	if err != nil {
+		return nil, err
+	}
+
+	user := urlpkg.UserPassword("", viper.GetString("GITEA_TOKEN"))
+	u.User = user
+
+	gtc, err = gitea.NewClient(u.String())
+	if err != nil {
+		return nil, err
+	}
+
+	return &GiteaClient{
+		Client:  gtc,
+		Token:   []string{viper.GetString("GITEA_TOKEN")},
+		BaseURL: u.String(),
+	}, nil
+}
+
+func (c *GiteaClient) AddUsersToTeam(users []GiteaAccount, team int64) error {
+	zap.L().Debug("")
+
+	for i, thisUser := range users {
+		sr := gitea.SearchUsersOption{
+			KeyWord: thisUser.FullName,
+		}
+		foundUsers, _, err := c.SearchUsers(sr)
+		if err != nil {
+			return err
+		}
+
+		for _, foundUser := range foundUsers {
+			if strings.EqualFold(thisUser.Login, foundUser.UserName) {
+				_, err = c.Client.AddTeamMember(team, users[i].Login)
+				if err != nil {
+					return err
 				}
 			}
 		}
 	}
-	return true
+
+	return nil
 }
 
-func (c *GiteaClient) DelUsersFromTeam(users []GiteaAccount, team int) bool {
-	ctx := context.Background()
-	for i := 0; i < len(users); i++ {
-		c.Command = "/api/v1/users/search?uid=" + fmt.Sprintf("%d", users[i].ID) + "&access_token="
-
-		foundUser := c.RequestSearchResults()
-
-		c.Command = "/api/v1/teams/" + fmt.Sprintf(
-			"%d", team,
-		) + "/members/" + foundUser.Data[0].Login + "?access_token="
-		c.RequestDel(ctx)
+func (c *GiteaClient) DelUsersFromTeam(users []GiteaAccount, team int64) error {
+	for _, thisUser := range users {
+		_, err := c.RemoveTeamMember(team, thisUser.FullName)
+		if err != nil {
+			return err
+		}
 	}
-	return true
+
+	return nil
 }
 
-func (c *GiteaClient) CreateOrganization(o GiteaOrganization) bool {
-	ctx := context.Background()
-	c.Command = "/api/v1/orgs/" + "?access_token="
+func (c *GiteaClient) CreateOrganization(o GiteaOrganization) error {
+	zap.L().Debug("")
 
-	data := []byte(fmt.Sprintf(
-		`{
-	"description": "%[1]v",
-	"full_name": "%[2]v",
-	"location": "%[3]v",
-	"repo_admin_change_team_access": %[4]v,
-	"username": "%[5]v",
-	"visibility": "%[6]v",
-	"website": "%[7]v"
-}`, o.Description, o.FullName, o.Location, false, o.Name, o.Visibility, o.Website,
-	))
+	orgs, err := c.ListOrganizations()
+	if err != nil {
+		return err
+	}
 
-	c.RequestPost(ctx, bytes.NewBuffer(data))
+	exist := false
+	for _, org := range orgs {
+		if org.UserName == o.UserName {
+			exist = true
+		}
+	}
 
-	return true
+	if !exist {
+		zap.S().Infof(`Creating organization: "%v".`, o.UserName)
+		opts := gitea.CreateOrgOption{
+			Name:                      o.Description,
+			FullName:                  o.FullName,
+			Description:               o.Description,
+			Website:                   o.Website,
+			Location:                  o.Location,
+			Visibility:                gitea.VisibleType(o.Visibility),
+			RepoAdminChangeTeamAccess: o.RepoAdminChangeTeamAccess,
+		}
+		_, _, err := c.CreateOrg(opts)
+		return err
+	}
+	zap.S().Infof(`Organization "%v" already exist.`, o.UserName)
+
+	return nil
 }
 
-func (c *GiteaClient) DeleteOrganization(orgName string) bool {
-	ctx := context.Background()
-	c.Command = "/api/v1/orgs/" + orgName + "?access_token="
+func (c *GiteaClient) DeleteOrganization(orgname string) error {
+	zap.S().Infof("Deleting organization: %v", orgname)
 
-	zap.S().Infof("Deleting organization: %v", orgName)
-	c.RequestDel(ctx)
-	return true
+	opts := gitea.ListOrgReposOptions{}
+	repos, _, err := c.Client.ListOrgRepos(orgname, opts)
+	if err != nil {
+		return err
+	}
+
+	for _, repo := range repos {
+		_, err = c.Client.DeleteRepo(orgname, repo.Name)
+		if err != nil {
+			return err
+		}
+	}
+
+	_, err = c.Client.DeleteOrg(orgname)
+	return err
 }
 
-func (c *GiteaClient) CreateTeam(orgName string, t GiteaTeam, o GiteaCreateTeamOpts) bool {
-	ctx := context.Background()
-	c.Command = "/api/v1/orgs/" + orgName + "/teams?access_token="
+func (c *GiteaClient) CreateTeam(orgname string, t GiteaTeam, o GiteaCreateTeamOpts) error {
+	ltopts := gitea.ListTeamsOptions{}
+	teams, _, err := c.Client.ListOrgTeams(orgname, ltopts)
+	if err != nil {
+		return err
+	}
 
-	data := []byte(fmt.Sprintf(
-		`{
-	"can_create_org_repo": %[1]v,
-	"description": "%[2]v",
-	"includes_all_repositories": %[3]v,
-	"name": "%[4]v",
-	"permission": "%[5]v",
-	"units": %[6]v,
-	"units_map": %[7]v
-}`, o.CanCreateOrgRepo, t.Description, o.IncludesAllRepositories, t.Name, o.Permission, o.Units,
-		o.UnitsMap,
-	))
+	exist := false
+	for _, team := range teams {
+		if team.Name == t.Name {
+			exist = true
+		}
+	}
 
-	c.RequestPost(ctx, bytes.NewBuffer(data))
+	if !exist {
+		zap.S().Infof(`Creating team: "%v", in organization: "%v"`, t.Name, orgname)
+		opts := gitea.CreateTeamOption{
+			Name:                    t.Name,
+			Description:             t.Description,
+			Permission:              o.Permission,
+			CanCreateOrgRepo:        o.CanCreateOrgRepo,
+			IncludesAllRepositories: o.IncludesAllRepositories,
+			Units:                   o.Units,
+		}
+		_, _, err := c.Client.CreateTeam(orgname, opts)
+		return err
+	}
 
-	return true
+	zap.S().Infof(`Team: "%v", already exist in organization: "%v"`, t.Name, orgname)
+
+	return nil
 }
 
-func (c *GiteaClient) DeleteTeam(teamID int) bool {
-	ctx := context.Background()
-	c.Command = "/api/v1/teams/" + fmt.Sprintf("%d", teamID) + "?access_token="
-
+func (c *GiteaClient) DeleteTeam(teamID int64) error {
 	zap.S().Infof("Deleting team with ID: %v", teamID)
-	c.RequestDel(ctx)
-	return true
+
+	_, err := c.Client.DeleteTeam(teamID)
+	return err
 }
 
-func CheckStatusCode(res *http.Response) {
-	switch {
-	case http.StatusMultipleChoices <= res.StatusCode && res.StatusCode < http.StatusBadRequest:
-		zap.L().Error("CheckStatusCode gitea apiKeys connection error: Redirect message")
-
-		buf := new(bytes.Buffer)
-		_, _ = buf.ReadFrom(res.Body)
-		zap.L().Error(buf.String())
-	case http.StatusUnauthorized == res.StatusCode:
-		zap.L().Error("CheckStatusCode gitea apiKeys connection Error: Unauthorized")
-
-		buf := new(bytes.Buffer)
-		_, _ = buf.ReadFrom(res.Body)
-		zap.L().Error(buf.String())
-	case http.StatusBadRequest <= res.StatusCode && res.StatusCode < 500:
-		zap.L().Error("CheckStatusCode gitea apiKeys connection error: Client error")
-
-		buf := new(bytes.Buffer)
-		_, _ = buf.ReadFrom(res.Body)
-		zap.L().Error(buf.String())
-	case http.StatusInternalServerError <= res.StatusCode && res.StatusCode < 600:
-		zap.L().Error("CheckStatusCode gitea apiKeys connection error Server error")
-
-		buf := new(bytes.Buffer)
-		_, _ = buf.ReadFrom(res.Body)
-		zap.L().Error(buf.String())
-	}
-}
-
-func (c *GiteaClient) RequestGet(ctxParent context.Context) []byte {
-	ctx, cancel := context.WithTimeout(ctxParent, time.Duration(c.ClientTimeout)*time.Second)
-	defer cancel()
-
-	cc := &http.Client{}
-	url := c.BaseURL + c.Command + c.Token[c.BruteforceToken]
-
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+func (c *GiteaClient) CreateUser(u GiteaUser) error {
+	opts := gitea.AdminListUsersOptions{}
+	users, _, err := c.Client.AdminListUsers(opts)
 	if err != nil {
-		zap.L().Fatal(err.Error())
+		return err
 	}
 
-	res, err := cc.Do(request)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	CheckStatusCode(res)
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	_ = res.Body.Close()
-
-	return b
-}
-
-func (c *GiteaClient) RequestPut(ctxParent context.Context) []byte {
-	ctx, cancel := context.WithTimeout(ctxParent, time.Duration(c.ClientTimeout)*time.Second)
-	defer cancel()
-
-	cc := &http.Client{Timeout: time.Second * time.Duration(c.ClientTimeout)}
-	url := c.BaseURL + c.Command + c.Token[c.BruteforceToken]
-	request, err := http.NewRequestWithContext(ctx, http.MethodPut, url, nil)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	res, err := cc.Do(request)
-
-	CheckStatusCode(res)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	b, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	_ = res.Body.Close()
-
-	return b
-}
-
-func (c *GiteaClient) RequestDel(ctxParent context.Context) {
-	ctx, cancel := context.WithTimeout(ctxParent, time.Duration(c.ClientTimeout)*time.Second)
-	defer cancel()
-
-	cc := &http.Client{Timeout: time.Second * time.Duration(c.ClientTimeout)}
-	url := c.BaseURL + c.Command + c.Token[c.BruteforceToken]
-	request, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	res, err := cc.Do(request)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	CheckStatusCode(res)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	_, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	_ = res.Body.Close()
-}
-
-func (c *GiteaClient) RequestPost(ctxParent context.Context, body io.Reader) {
-	ctx, cancel := context.WithTimeout(ctxParent, time.Duration(c.ClientTimeout)*time.Second)
-	defer cancel()
-
-	cc := &http.Client{}
-	url := c.BaseURL + c.Command + c.Token[c.BruteforceToken]
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, body)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	request.Header.Set("Content-Type", "application/json; charset=UTF-8")
-
-	dump, _ := httputil.DumpRequest(request, true)
-	zap.L().Debug(string(dump))
-
-	res, err := cc.Do(request)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	CheckStatusCode(res)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	_, err = ioutil.ReadAll(res.Body)
-	if err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	_ = res.Body.Close()
-}
-
-func (c *GiteaClient) RequestSearchResults() SearchResults {
-	ctx := context.Background()
-	b := c.RequestGet(ctx)
-
-	var f SearchResults
-	if err := json.Unmarshal(b, &f); err != nil {
-		zap.L().Fatal(err.Error())
-	}
-
-	return f
-}
-
-func (c *GiteaClient) RequestUsersList(teamID int) (map[string]GiteaAccount, int) {
-	ctx := context.Background()
-	c.Command = "/api/v1/teams/" + fmt.Sprintf(
-		"%d", teamID,
-	) + "/members?access_token="
-
-	b := c.RequestGet(ctx)
-
-	var AccountU = make(map[string]GiteaAccount)
-
-	var f []GiteaAccount
-	err := json.Unmarshal(b, &f)
-	if err != nil {
-		zap.L().Info(err.Error())
-		if c.BruteforceToken == len(c.Token)-1 {
-			zap.L().Info("Token key is unsuitable, call to system administrator ")
-		} else {
-			zap.L().Info("Can't get UsersList try another token key")
-		}
-		if c.BruteforceToken < len(c.Token)-1 {
-			c.BruteforceToken++
-			zap.S().Infof("BruteforceToken=%d", c.BruteforceToken)
-			AccountU, c.BruteforceToken = c.RequestUsersList(teamID)
+	exist := false
+	for _, user := range users {
+		if user.UserName == u.UserName {
+			exist = true
 		}
 	}
 
-	for i := 0; i < len(f); i++ {
-		AccountU[f[i].Login] = GiteaAccount{
-			//			Email:     f[i].Email,
-			ID:       f[i].ID,
-			FullName: f[i].FullName,
-			Login:    f[i].Login,
+	if !exist {
+		zap.S().Infof(`Creating user: "%v"`, u.UserName)
+		opts := gitea.CreateUserOption{
+			LoginName:          u.UserName,
+			Username:           u.UserName,
+			FullName:           u.FullName,
+			Email:              u.Email,
+			MustChangePassword: gitea.OptionalBool(false),
+			Visibility:         OptionalVisibility(u.Visibility),
+		}
+
+		_, _, err = c.Client.AdminCreateUser(opts)
+		if err != nil {
+			return err
 		}
 	}
-	return AccountU, c.BruteforceToken
-}
 
-func (c *GiteaClient) RequestOrganizationList() []GiteaOrganization {
-	c.BruteforceToken = 0
-	c.Command = "/api/v1/admin/orgs?limit=1000&access_token="
-
-	ctx := context.Background()
-	b := c.RequestGet(ctx)
-
-	var f []GiteaOrganization
-	if err := json.Unmarshal(b, &f); err != nil {
-		zap.S().Infof("Please check setting GITEA_TOKEN, GITEA_BASE_URL ")
-		zap.L().Fatal(err.Error())
-	}
-	return f
-}
-
-func (c *GiteaClient) RequestTeamList(organizationName string) []GiteaTeam {
-	c.Command = "/api/v1/orgs/" + organizationName + "/teams?access_token="
-
-	ctx := context.Background()
-	b := c.RequestGet(ctx)
-
-	var f []GiteaTeam
-	if err := json.Unmarshal(b, &f); err != nil {
-		zap.L().Fatal(err.Error())
-	}
-	return f
-}
-
-func parseJSON(b []byte) interface{} {
-	var f interface{}
-
-	if err := json.Unmarshal(b, &f); err != nil {
-		zap.L().Fatal(err.Error())
+	eOpts := gitea.EditUserOption{
+		LoginName:               u.UserName,
+		Email:                   gitea.OptionalString(u.Email),
+		FullName:                gitea.OptionalString(u.FullName),
+		MaxRepoCreation:         OptionalInt(viper.GetInt("sync_config.defaults.max_repo_creation")),
+		AllowCreateOrganization: gitea.OptionalBool(viper.GetBool("sync_config.defaults.allow_create_organization")),
+		Visibility:              OptionalVisibility(gitea.VisibleType(viper.GetString("sync_config.defaults.visibility"))),
+		Admin:                   OptionalBool(u.IsAdmin),
+		Restricted:              OptionalBool(u.Restricted),
 	}
 
-	return f
+	_, err = c.Client.AdminEditUser(u.UserName, eOpts)
+	if err != nil {
+		return err
+	}
+
+	zap.S().Infof(`User: "%v", already exist.`, u.UserName)
+
+	return nil
+}
+
+func (c *GiteaClient) DeleteUser(username string) error {
+	zap.S().Infof("Deleting user: %v", username)
+
+	_, err := c.Client.AdminDeleteUser(username)
+
+	return err
+}
+
+func (c *GiteaClient) ListTeamUsers(teamID int64) (map[string]GiteaAccount, error) {
+	var accounts = make(map[string]GiteaAccount)
+
+	opts := gitea.ListTeamMembersOptions{}
+	foundUsers, _, err := c.Client.ListTeamMembers(teamID, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, user := range foundUsers {
+		accounts[user.UserName] = GiteaAccount{
+			Email:    user.Email,
+			ID:       int(user.ID),
+			FullName: user.FullName,
+			Login:    user.UserName,
+		}
+	}
+
+	return accounts, nil
+}
+
+func (c *GiteaClient) ListOrganizations() ([]*gitea.Organization, error) {
+	opts := gitea.AdminListOrgsOptions{}
+	orgs, _, err := c.Client.AdminListOrgs(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return orgs, nil
+}
+
+func (c *GiteaClient) ListTeams(orgname string) ([]*gitea.Team, error) {
+	opts := gitea.ListTeamsOptions{}
+	teams, _, err := c.ListOrgTeams(orgname, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return teams, nil
+}
+
+func (c *GiteaClient) AdminListUsers() ([]*gitea.User, error) {
+	opts := gitea.AdminListUsersOptions{}
+	users, _, err := c.Client.AdminListUsers(opts)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
 }

@@ -1,78 +1,54 @@
 package main
 
-import "gopkg.in/ldap.v3"
+import (
+	"code.gitea.io/sdk/gitea"
+	"gopkg.in/ldap.v3"
+)
 
 func (o *GiteaOrganization) String() string {
-	return o.Name
+	return o.UserName
 }
 
 type GiteaOrganization struct {
-	ID          int    `json:"id"`
-	AvatarURL   string `json:"avatar_url"`
-	Description string `json:"description"`
-	FullName    string `json:"full_name"`
-	Location    string `json:"location"`
-	Name        string `json:"username"`
-	Visibility  string `json:"visibility"`
-	Website     string `json:"website"`
+	*gitea.Organization
+
+	RepoAdminChangeTeamAccess bool `json:"repoAdminChangeTeamAccess"`
 }
 
 type GiteaTeam struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	// Permission  string `json:"permission"`
-	// CanCreateOrgRepo        bool   `json:"can_create_org_repo"`
-	// IncludesAllRepositories bool   `json:"includes_all_repositories"`
-	// Units                   string
-	// UnitsMap                string
+	*gitea.Team
 }
 
 type GiteaCreateTeamOpts struct {
-	Permission              string
+	Permission              gitea.AccessMode
 	CanCreateOrgRepo        bool
 	IncludesAllRepositories bool
-	Units                   string
-	UnitsMap                string
+	Units                   []gitea.RepoUnitType
 }
 
 type GiteaUser struct {
-	ID        int    `json:"id"`
-	AvatarURL string `json:"avatar_url"`
-	Created   string `json:"created"`
-	Email     string `json:"email"`
-	FullName  string `json:"full_name"`
-	IsAdmin   bool   `json:"is_admin"`
-	Language  string `json:"language"`
-	LastLogin string `json:"last_login"`
-	Login     string `json:"login"`
+	*gitea.User
 }
 
 type GiteaAccount struct {
 	ID       int    `json:"id"`
 	FullName string `json:"full_name"`
 	Login    string `json:"login"`
-}
-
-type SearchResults struct {
-	Data []GiteaUser `json:"data"`
-	Ok   bool        `json:"ok"`
+	Email    string `json:"email"`
 }
 
 type GiteaClient struct {
-	Token           []string `mapstructure:"token"`
-	BaseURL         string   `mapstructure:"base_url"`
-	Command         string
-	BruteforceToken int
-	ClientTimeout   int `mapstructure:"client_timeout"`
+	*gitea.Client
+	Token   []string `mapstructure:"token"`
+	BaseURL string   `mapstructure:"base_url"`
 }
 
 // Config describes the settings of the application. This structure is used in the settings-import process.
 type Config struct {
-	GiteaClient GiteaClient `mapstructure:"gitea"`
-	LDAP        LDAP        `mapstructure:"ldap"`
-	CronTimer   string      `mapstructure:"cron_timer"`
-	SyncConfig  SyncConfig  `mapstructure:"sync_config"`
+	GiteaClient *GiteaClient `mapstructure:"gitea"`
+	LDAP        LDAP         `mapstructure:"ldap"`
+	CronTimer   string       `mapstructure:"cron_timer"`
+	SyncConfig  SyncConfig   `mapstructure:"sync_config"`
 }
 
 type SyncConfig struct {
@@ -84,26 +60,38 @@ type SyncConfig struct {
 			Visibility                string `mapstructure:"visibility"`
 		} `mapstructure:"organization"`
 		Team struct {
-			CanCreateOrgRepo        bool   `mapstructure:"can_create_org_repo"`
-			IncludesAllRepositories bool   `mapstructure:"includes_all_repositories"`
-			Permission              string `mapstructure:"permission"`
-			Units                   string `mapstructure:"units"`
-			UnitsMap                string `mapstructure:"units_map"`
+			CanCreateOrgRepo        bool                 `mapstructure:"can_create_org_repo"`
+			IncludesAllRepositories bool                 `mapstructure:"includes_all_repositories"`
+			Permission              gitea.AccessMode     `mapstructure:"permission"`
+			Units                   []gitea.RepoUnitType `mapstructure:"units"`
 		} `mapstructure:"team"`
 	} `mapstructure:"defaults"`
 }
 
 type LDAP struct {
-	URL                   string   `mapstructure:"url"`
-	Port                  int      `mapstructure:"port"`
-	UseTLS                bool     `mapstructure:"use_tls"`
-	AllowInsecureTLS      bool     `mapstructure:"allow_insecure_tls"`
-	BindDN                string   `mapstructure:"bind_dn"`
-	BindPassword          string   `mapstructure:"bind_password"`
-	UserFilter            string   `mapstructure:"user_filter"`
-	UserSearchBase        string   `mapstructure:"user_search_base"`
-	UserIdentityAttribute string   `mapstructure:"user_identity_attribute"`
-	UserFullName          string   `mapstructure:"user_fullname"`
+	URL              string `mapstructure:"url"`
+	Port             int    `mapstructure:"port"`
+	UseTLS           bool   `mapstructure:"use_tls"`
+	AllowInsecureTLS bool   `mapstructure:"allow_insecure_tls"`
+	BindDN           string `mapstructure:"bind_dn"`
+	BindPassword     string `mapstructure:"bind_password"`
+	UserFilter       string `mapstructure:"user_filter"`
+	UserSearchBase   string `mapstructure:"user_search_base"`
+
+	UserUsernameAttribute     string `mapstructure:"user_username_attribute"`
+	UserFullNameAttribute     string `mapstructure:"user_fullname_attribute"`
+	UserFirstNameAttribute    string `mapstructure:"user_first_name_attribute"`
+	UserSurnameAttribute      string `mapstructure:"user_surname_attribute"`
+	UserEmailAttribute        string `mapstructure:"user_email_attribute"`
+	UserPublicSSHKeyAttribute string `mapstructure:"user_public_ssh_key_attribute"`
+	UserAvatarAttribute       string `mapstructure:"user_avatar_attribute"`
+
+	ExcludeUsers      []string `mapstructure:"exclude_users"`
+	ExcludeUsersRegex string   `mapstructure:"exclude_users_regex"`
+
+	AdminFilter      string `mapstructure:"admin_filter"`
+	RestrictedFilter string `mapstructure:"restricted_filter"`
+
 	GroupSearchBase       string   `mapstructure:"group_search_base"`
 	GroupFilter           string   `mapstructure:"group_filter"`
 	SubGroupSearchBase    string   `mapstructure:"subgroup_search_base"`
@@ -112,11 +100,13 @@ type LDAP struct {
 	ExcludeGroupsRegex    string   `mapstructure:"exclude_groups_regex"`
 	ExcludeSubgroups      []string `mapstructure:"exclude_subgroups"`
 	ExcludeSubgroupsRegex string   `mapstructure:"exclude_subgroups_regex"`
+
 	ldap.Client
 }
 
 type Directory struct {
 	Organizations map[string]*LDAPOrganization
+	Users         map[string]*LDAPUser
 }
 
 type LDAPOrganization struct {
@@ -132,6 +122,8 @@ type LDAPTeam struct {
 }
 
 type LDAPUser struct {
-	Name string
+	Name       string
+	Restricted *bool
+	Admin      *bool
 	*ldap.Entry
 }

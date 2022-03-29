@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: gitea-group-sync
+  name: gitea-ldap-sync
 spec:
   replicas: 1
   strategy:
@@ -9,11 +9,11 @@ spec:
   template:
     metadata:
       labels:
-        app: gitea-group-sync
+        app: gitea-ldap-sync
     spec:
       containers:
-        - name: gitea-group-sync
-          image: ghcr.io/janosmiko/gitea-group-sync:latest
+        - name: gitea-ldap-sync
+          image: ghcr.io/janosmiko/gitea-ldap-sync:latest
           imagePullPolicy: Always
           env:
             - name: DEBUG
@@ -24,7 +24,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: gitea-token
-                  name: gitea-group-sync
+                  name: gitea-ldap-sync
             - name: LDAP_URL
               value: ldap.example.com
             - name: LDAP_PORT
@@ -39,15 +39,29 @@ spec:
               valueFrom:
                 secretKeyRef:
                   key: ldap-bind-password
-                  name: gitea-group-sync
+                  name: gitea-ldap-sync
             - name: LDAP_USER_SEARCH_BASE
               value: 'ou=users,DC=ldap,DC=example,DC=com'
             - name: LDAP_USER_FILTER
               value: '(&(objectClass=user)(memberOf=*))'
-            - name: LDAP_USER_IDENTITY_ATTRIBUTE
+            - name: LDAP_USER_USERNAME_ATTRIBUTE
               value: 'sAMAccountName'
-            - name: LDAP_USER_FULLNAME
+            - name: LDAP_USER_FULLNAME_ATTRIBUTE
               value: 'cn'
+            - name: LDAP_USER_FIRST_NAME_ATTRIBUTE
+              value: 'name'
+            - name: LDAP_USER_SURNAME_ATTRIBUTE
+              value: ''
+            - name: LDAP_USER_EMAIL_ATTRIBUTE
+              value: 'mail'
+            - name: LDAP_USER_PUBLIC_SSH_KEY_ATTRIBUTE
+              value: 'sshPublicKey'
+            - name: LDAP_USER_AVATAR_ATTRIBUTE
+              value: 'avatar'
+            - name: LDAP_ADMIN_FILTER
+              value: ''
+            - name: LDAP_RESTRICTED_FILTER
+              value: ''
             - name: LDAP_GROUP_SEARCH_BASE
               value: 'ou=groups,DC=ldap,DC=example,DC=com'
             - name: LDAP_GROUP_FILTER
@@ -56,6 +70,10 @@ spec:
               value: 'ou=groups,DC=ldap,DC=example,DC=com'
             - name: LDAP_SUBGROUP_FILTER
               value: '(&(objectClass=group)(memberOf=*))'
+            - name: LDAP_EXCLUDE_USERS
+              value: 'root'
+            - name: LDAP_EXCLUDE_USERS_REGEX
+              value: ''
             - name: LDAP_EXCLUDE_GROUPS
               value: ''
             - name: LDAP_EXCLUDE_GROUPS_REGEX
@@ -79,4 +97,4 @@ spec:
       - key: app
         operator: In
         values:
-          - gitea-group-sync
+          - gitea-ldap-sync

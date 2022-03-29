@@ -8,14 +8,17 @@ import (
 	"sort"
 	"syscall"
 
+	"code.gitea.io/sdk/gitea"
 	"github.com/robfig/cron/v3"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/ldap.v3"
 )
 
 func main() {
 	conf := zap.NewDevelopmentConfig()
+	conf.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 	if os.Getenv("DEBUG") == "true" {
 		conf.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
 	} else {
@@ -60,28 +63,113 @@ func mainJob() {
 	c.checkConfig()
 	zap.L().Info("Configuration is valid.")
 
+	gtc, err := NewGiteaClient()
+	if err != nil {
+		zap.L().Fatal(err.Error())
+	}
+	c.GiteaClient = gtc
+
 	c.LDAP.initLDAP()
 	defer c.LDAP.closeLDAP()
 
 	ldapDirectory := c.LDAP.getLDAPDirectory()
 
 	// Check organizations and teams in Gitea, add users to them.
-	giteaOrgs := c.GiteaClient.RequestOrganizationList()
-	zap.S().Infof("%d Groups were found in the LDAP server: %s", len(ldapDirectory.Organizations), c.LDAP.URL)
-	zap.S().Infof("%d Organizations were found in the Gitea server: %s", len(giteaOrgs), c.GiteaClient.BaseURL)
+	giteaOrgs, err := c.GiteaClient.ListOrganizations()
+	if err != nil {
+		zap.L().Error(err.Error())
+	}
+	zap.S().Infof("%d Organization Groups were found in the LDAP server.", len(ldapDirectory.Organizations))
+	zap.S().Infof("%d Organizations were found in Gitea.", len(giteaOrgs))
+
+	giteaUsers, err := c.GiteaClient.AdminListUsers()
+	if err != nil {
+		zap.L().Error(err.Error())
+	}
+	zap.S().Infof("%d Users were found in the LDAP server.", len(ldapDirectory.Users))
+	zap.S().Infof("%d Users were found in Gitea.", len(giteaUsers))
 
 	if c.SyncConfig.CreateGroups {
-		c.syncLDAPToGitea(ldapDirectory, giteaOrgs)
+		if err = c.syncLDAPUsersToGitea(ldapDirectory, giteaUsers); err != nil {
+			zap.L().Error(err.Error())
+		}
+
+		if err = c.syncLDAPGroupsToGitea(ldapDirectory, giteaOrgs); err != nil {
+			zap.L().Error(err.Error())
+		}
 	}
 
-	c.syncGiteaByLDAP(giteaOrgs, ldapDirectory)
+	if err = c.syncGiteaUsersByLDAP(giteaUsers, ldapDirectory); err != nil {
+		zap.L().Error(err.Error())
+	}
+	if err = c.syncGiteaGroupsByLDAP(giteaOrgs, ldapDirectory); err != nil {
+		zap.L().Error(err.Error())
+	}
+}
+
+func (c *Config) syncLDAPUsersToGitea(ldapDirectory *Directory, giteaUsers []*gitea.User) error {
+	zap.L().Info("=======================================")
+	zap.L().Info("Syncing Users from LDAP.")
+
+	for _, u := range ldapDirectory.Users {
+		if len(c.LDAP.ExcludeUsersRegex) > 0 {
+			r := regexp.MustCompile(c.LDAP.ExcludeUsersRegex)
+			if r.MatchString(u.Name) {
+				zap.S().Infof(
+					`Syncing LDAP User "%v" is skipped. Reason: it's on the regex exclude list.`,
+					u.Name,
+				)
+				continue
+			}
+		}
+		if contains(c.LDAP.ExcludeUsers, u.Name) {
+			zap.S().Infof(`Syncing LDAP User "%v" is skipped. Reason: it's on the exclude list.`, u.Name)
+			continue
+		}
+
+		zap.S().Infof(`Syncing LDAP User "%v" to Gitea.`, u.Name)
+
+		if !existInSlice(u.Name, giteaUsers) {
+			zap.S().Infof(`User "%v" does not exist in Gitea, creating...`, u.Name)
+
+			fn := u.GetAttributeValue(viper.GetString("ldap.user_first_name_attribute"))
+			sn := u.GetAttributeValue(viper.GetString("ldap.user_surname_attribute"))
+			fullname := ""
+			if len(fn) > 0 && len(sn) > 0 {
+				fullname = fmt.Sprintf("%v %v", fn, sn)
+			} else {
+				fullname = u.GetAttributeValue(viper.GetString("ldap.user_fullname_attribute"))
+			}
+
+			user := GiteaUser{
+				User: &gitea.User{
+					UserName:   u.GetAttributeValue(viper.GetString("ldap.user_username_attribute")),
+					FullName:   fullname,
+					Email:      u.GetAttributeValue(viper.GetString("ldap.user_email_attribute")),
+					AvatarURL:  u.GetAttributeValue(viper.GetString("ldap.user_avatar_attribute")),
+					IsAdmin:    *u.Admin,
+					Restricted: *u.Restricted,
+					Visibility: gitea.VisibleTypePrivate,
+				},
+			}
+			if err := c.GiteaClient.CreateUser(user); err != nil {
+				return err
+			}
+		}
+	}
+
+	zap.L().Info("Syncing Groups and Subgroups from LDAP finished.")
+
+	return nil
 }
 
 // syncLDAPToGitea iterates through the ldapDirectory.
 // Creates Gitea Organizations based on the LDAP Groups and creates Gitea Teams based on the LDAP Subgroups.
-func (c *Config) syncLDAPToGitea(ldapDirectory *Directory, giteaOrganizations []GiteaOrganization) {
+// nolint: gocognit
+func (c *Config) syncLDAPGroupsToGitea(ldapDirectory *Directory, giteaOrganizations []*gitea.Organization) error {
 	zap.L().Info("=======================================")
 	zap.L().Info("Syncing Groups and Subgroups from LDAP.")
+
 	for _, o := range ldapDirectory.Organizations {
 		if len(c.LDAP.ExcludeGroupsRegex) > 0 {
 			r := regexp.MustCompile(c.LDAP.ExcludeGroupsRegex)
@@ -103,15 +191,22 @@ func (c *Config) syncLDAPToGitea(ldapDirectory *Directory, giteaOrganizations []
 		if !existInSlice(o.Name, giteaOrganizations) {
 			zap.S().Infof(`Group "%v" does not exist in Gitea, creating...`, o.Name)
 			org := GiteaOrganization{
-				Description: o.Name,
-				FullName:    o.Name,
-				Name:        o.Name,
-				Visibility:  "private",
+				Organization: &gitea.Organization{
+					UserName:    o.Name,
+					FullName:    o.Name,
+					Description: o.Name,
+					Visibility:  "private",
+				},
 			}
-			c.GiteaClient.CreateOrganization(org)
+			if err := c.GiteaClient.CreateOrganization(org); err != nil {
+				return err
+			}
 		}
 
-		giteaTeams := c.GiteaClient.RequestTeamList(o.Name)
+		giteaTeams, err := c.GiteaClient.ListTeams(o.Name)
+		if err != nil {
+			return err
+		}
 		for _, t := range o.Teams {
 			if len(c.LDAP.ExcludeSubgroupsRegex) > 0 {
 				r := regexp.MustCompile(c.LDAP.ExcludeSubgroupsRegex)
@@ -134,108 +229,175 @@ func (c *Config) syncLDAPToGitea(ldapDirectory *Directory, giteaOrganizations []
 			if !existInSlice(t.Name, giteaTeams) {
 				zap.S().Infof(`Team "%v" does not exist in Gitea, creating...`, t.Name)
 				team := GiteaTeam{
-					Name:        t.Name,
-					Description: t.Name,
+					Team: &gitea.Team{
+						Name:        t.Name,
+						Description: t.Name,
+					},
 				}
 				opts := GiteaCreateTeamOpts{
 					Permission:              c.SyncConfig.Defaults.Team.Permission,
 					CanCreateOrgRepo:        c.SyncConfig.Defaults.Team.CanCreateOrgRepo,
 					IncludesAllRepositories: c.SyncConfig.Defaults.Team.IncludesAllRepositories,
 					Units:                   c.SyncConfig.Defaults.Team.Units,
-					UnitsMap:                c.SyncConfig.Defaults.Team.UnitsMap,
+					// UnitsMap:                c.SyncConfig.Defaults.Team.UnitsMap,
 				}
-				c.GiteaClient.CreateTeam(o.Name, team, opts)
+				if err = c.GiteaClient.CreateTeam(o.Name, team, opts); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	zap.L().Info("Syncing Groups and Subgroups from LDAP finished.")
+
+	return nil
+}
+
+func (c *Config) syncGiteaUsersByLDAP(giteaUsers []*gitea.User, ldapDirectory *Directory) error {
+	zap.L().Info("=======================================")
+	zap.L().Info("Syncing Users in Gitea.")
+
+	for _, u := range giteaUsers {
+		zap.S().Infof("Begin user review: UserName: %v", u.UserName)
+
+		if len(c.LDAP.ExcludeUsersRegex) > 0 {
+			r := regexp.MustCompile(c.LDAP.ExcludeUsersRegex)
+			if r.MatchString(u.UserName) {
+				zap.S().Infof(
+					`Syncing LDAP User "%v" is skipped. Reason: it's on the regex exclude list.`,
+					u.UserName,
+				)
+				continue
+			}
+		}
+		if contains(c.LDAP.ExcludeUsers, u.UserName) {
+			zap.S().Infof(
+				`Syncing LDAP User "%v" is skipped. Reason: it's on the exclude list.`, u.UserName,
+			)
+			continue
+		}
+
+		user := ldapDirectory.Users[u.UserName]
+
+		zap.L().Info("Checking user in LDAP: " + u.UserName)
+		switch {
+		case user != nil:
+			zap.S().Infof(`User "%v" exist in LDAP.`, u.UserName)
+		case c.SyncConfig.FullSync:
+			zap.S().Infof(
+				`User "%v" does not exist in LDAP. Full Sync is enabled. Deleting from Gitea...`,
+				u.UserName,
+			)
+			if err := c.GiteaClient.DeleteUser(u.UserName); err != nil {
+				return err
+			}
+			continue
+		default:
+			zap.S().Infof(
+				`User "%v" does not exist in LDAP. Full Sync is not enabled. Continue...`,
+				u.UserName,
+			)
+			continue
+		}
+	}
+
+	return nil
 }
 
 // syncGiteaByLDAP iterates through all Gitea Organizations and all Teams inside the organizations.
 // It is going to attach the Gitea Users to Gitea Teams (if the LDAP users are members of the LDAP Subgroups and if
 // those LDAP Subgroups are members of LDAP Groups).
-func (c *Config) syncGiteaByLDAP(
-	giteaOrganizations []GiteaOrganization, ldapDirectory *Directory,
-) {
+// nolint: gocognit
+func (c *Config) syncGiteaGroupsByLDAP(
+	giteaOrganizations []*gitea.Organization, ldapDirectory *Directory,
+) error {
 	zap.L().Info("=======================================")
 	zap.L().Info("Syncing Users to Teams in Gitea.")
 
-	orgNames := make([]string, len(giteaOrganizations))
+	orgnames := make([]string, len(giteaOrganizations))
 	for i, v := range giteaOrganizations {
-		orgNames[i] = v.Name
+		orgnames[i] = v.UserName
 	}
 
-	zap.S().Infof("Organizations in Gitea: %v", orgNames)
+	zap.S().Infof("Organizations in Gitea: %v", orgnames)
 
-	for i := 0; i < len(giteaOrganizations); i++ {
+	for _, o := range giteaOrganizations {
 		zap.S().Infof(
-			"Begin an organization review: OrganizationName: %v, OrganizationId: %d \n",
-			giteaOrganizations[i].Name,
-			giteaOrganizations[i].ID,
+			"Begin an organization review: OrganizationName: %v, OrganizationId: %d.",
+			o.UserName,
+			o.ID,
 		)
 
-		teamList := c.GiteaClient.RequestTeamList(giteaOrganizations[i].Name)
-		zap.S().Infof("%d teams were found in %s organization", len(teamList), giteaOrganizations[i].Name)
-		// c.GiteaClient.BruteforceTokenKey = 0
+		teamList, err := c.GiteaClient.ListTeams(o.UserName)
+		if err != nil {
+			return err
+		}
+		zap.S().Infof("%d teams were found in %s organization", len(teamList), o.UserName)
 
 		var org *LDAPOrganization
 		var team *LDAPTeam
 
-		org = ldapDirectory.Organizations[giteaOrganizations[i].Name]
-		zap.L().Info("Checking organization in LDAP: " + giteaOrganizations[i].Name)
+		org = ldapDirectory.Organizations[o.UserName]
+		zap.L().Info("Checking organization in LDAP: " + o.UserName)
 		switch {
 		case org != nil:
-			zap.S().Infof(`Organization "%v" exist in LDAP.`, giteaOrganizations[i].Name)
+			zap.S().Infof(`Organization "%v" exist in LDAP.`, o.UserName)
 		case c.SyncConfig.FullSync:
 			zap.S().Infof(
-				`Organization "%v" does not exist in LDAP. Deleting from Gitea...`,
-				giteaOrganizations[i].Name,
+				`Organization "%v" does not exist in LDAP. Full Sync is enabled. Deleting from Gitea...`,
+				o.UserName,
 			)
-			c.GiteaClient.DeleteOrganization(giteaOrganizations[i].Name)
+			if err = c.GiteaClient.DeleteOrganization(o.UserName); err != nil {
+				return err
+			}
 			continue
 		default:
 			zap.S().Infof(
-				`Organization "%v" does not exist in LDAP.`,
-				giteaOrganizations[i].Name,
+				`Organization "%v" does not exist in LDAP. Full Sync is not enabled. Continue...`,
+				o.UserName,
 			)
 			continue
 		}
 
-		for j := 0; j < len(teamList); j++ {
-			team = org.Teams[teamList[j].Name]
+		for _, t := range teamList {
+			team = org.Teams[t.Name]
 
-			if teamList[j].Name == "Owners" {
-				zap.S().Infof(`Syncing "%v" team is skipped.`, teamList[j].Name)
+			if t.Name == "Owners" {
+				zap.S().Infof(`Syncing "%v" team is skipped.`, t.Name)
 				continue
 			}
-			zap.S().Infof(`Syncing "%v" team.`, teamList[j].Name)
+			zap.S().Infof(`Syncing "%v" team.`, t.Name)
 
 			var accountsInGitea map[string]GiteaAccount
 			var addUserToTeamList []GiteaAccount
 			var delUserFromTeamList []GiteaAccount
 
-			accountsInGitea, c.GiteaClient.BruteforceToken = c.GiteaClient.RequestUsersList(teamList[j].ID)
+			accountsInGitea, err = c.GiteaClient.ListTeamUsers(t.ID)
+			if err != nil {
+				return err
+			}
 			zap.S().Infof(
-				"Gitea has %d users corresponding to Team (name: %s, id=%d)",
-				len(accountsInGitea), teamList[j].Name, teamList[j].ID,
+				"Gitea has %d users corresponding to Team (name: %s, id=%d).",
+				len(accountsInGitea), t.Name, t.ID,
 			)
 
 			switch {
 			case team != nil:
-				zap.L().Info("Checking team in LDAP: " + team.Name)
+				zap.S().Infof("Checking team in LDAP: %v.", team.Name)
 				for _, u := range team.Users {
-					zap.S().Info("Processing user: " + u.Name)
-					if accountsInGitea[u.Name].Login != u.Entry.GetAttributeValue(c.LDAP.UserIdentityAttribute) {
+					zap.S().Infof("Processing user: %v.", u.Name)
+					if accountsInGitea[u.Name].Login != u.Entry.GetAttributeValue(c.LDAP.UserUsernameAttribute) {
 						acc := GiteaAccount{
-							FullName: u.Entry.GetAttributeValue(c.LDAP.UserFullName),
-							Login:    u.Entry.GetAttributeValue(c.LDAP.UserIdentityAttribute),
+							Login:    u.Entry.GetAttributeValue(c.LDAP.UserUsernameAttribute),
+							FullName: u.Entry.GetAttributeValue(c.LDAP.UserFullNameAttribute),
 						}
 
 						addUserToTeamList = append(addUserToTeamList, acc)
 					}
 				}
-				zap.S().Infof(`Users %v can be added to Team "%v"`, addUserToTeamList, team.Name)
-				c.GiteaClient.AddUsersToTeam(addUserToTeamList, teamList[j].ID)
+				zap.S().Infof(`Users %v can be added to Team "%v".`, addUserToTeamList, team.Name)
+				if err = c.GiteaClient.AddUsersToTeam(addUserToTeamList, t.ID); err != nil {
+					return err
+				}
 
 				for _, v := range accountsInGitea {
 					if !existInSlice(v.Login, team.Users) {
@@ -243,18 +405,26 @@ func (c *Config) syncGiteaByLDAP(
 					}
 				}
 
-				zap.S().Infof(`Users %v can be deleted from Team "%v"`, delUserFromTeamList, team.Name)
-				c.GiteaClient.DelUsersFromTeam(delUserFromTeamList, teamList[j].ID)
+				zap.S().Infof(`Users %v can be deleted from Team "%v".`, delUserFromTeamList, team.Name)
+				if err = c.GiteaClient.DelUsersFromTeam(
+					delUserFromTeamList, t.ID,
+				); err != nil {
+					return err
+				}
 
 			case c.SyncConfig.FullSync:
-				zap.L().Info(`Organization "" does not exist in LDAP. Deleting from Gitea...`)
-				c.GiteaClient.DeleteTeam(teamList[j].ID)
+				zap.L().Info(`Organization "" does not exist in LDAP. Full sync is enabled. Deleting from Gitea...`)
+				if err = c.GiteaClient.DeleteTeam(t.ID); err != nil {
+					return err
+				}
 				continue
 			}
 		}
 	}
 
 	zap.L().Info("Syncing Users to Teams in Gitea finished.")
+
+	return nil
 }
 
 func difference(a, b []*ldap.Entry) []*ldap.Entry {
@@ -275,7 +445,7 @@ func existInSlice(s string, slice interface{}) bool {
 	switch t := slice.(type) {
 	case []GiteaOrganization:
 		for _, v := range t {
-			if v.Name == s {
+			if v.UserName == s {
 				return true
 			}
 		}
@@ -291,6 +461,12 @@ func existInSlice(s string, slice interface{}) bool {
 				return true
 			}
 		}
+	case map[string]*gitea.User:
+		for _, v := range t {
+			if v.UserName == s {
+				return true
+			}
+		}
 	}
 
 	return false
@@ -300,4 +476,18 @@ func contains(s []string, searchterm string) bool {
 	sort.Strings(s)
 	i := sort.SearchStrings(s, searchterm)
 	return i < len(s) && s[i] == searchterm
+}
+
+func OptionalBool(b bool) *bool {
+	return &b
+}
+
+func OptionalVisibility(visibleType gitea.VisibleType) *gitea.VisibleType {
+	v := &visibleType
+
+	return v
+}
+
+func OptionalInt(v int) *int {
+	return &v
 }

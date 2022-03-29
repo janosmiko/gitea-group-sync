@@ -49,7 +49,7 @@ func (c *LDAP) initLDAP() {
 	c.Client = l
 }
 
-func (c *LDAP) getLDAPDirectory() *Directory {
+func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 	var err error
 	var searchRequest *ldap.SearchRequest
 	var searchResult *ldap.SearchResult
@@ -68,7 +68,52 @@ func (c *LDAP) getLDAPDirectory() *Directory {
 	if err != nil {
 		zap.L().Fatal(err.Error())
 	}
+	// All Users
 	usersInLDAP := searchResult.Entries
+
+	// Admin users
+	var adminUsersInLDAP []*ldap.Entry
+	if len(c.AdminFilter) > 0 {
+		// Search for users in LDAP
+		searchRequest = ldap.NewSearchRequest(
+			c.UserSearchBase,
+			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+			c.AdminFilter,
+			[]string{},
+			nil,
+		)
+
+		// make request to ldap server
+		searchResult, err = c.Client.Search(searchRequest)
+		if err != nil {
+			zap.L().Fatal(err.Error())
+		}
+		// All Users
+		adminUsersInLDAP = searchResult.Entries
+	}
+
+	_ = adminUsersInLDAP
+
+	// Restricted users
+	var restrictedUsersInLDAP []*ldap.Entry
+	if len(c.RestrictedFilter) > 0 {
+		// Search for users in LDAP
+		searchRequest = ldap.NewSearchRequest(
+			c.UserSearchBase,
+			ldap.ScopeWholeSubtree, ldap.NeverDerefAliases, 0, 0, false,
+			c.RestrictedFilter,
+			[]string{},
+			nil,
+		)
+
+		// make request to ldap server
+		searchResult, err = c.Client.Search(searchRequest)
+		if err != nil {
+			zap.L().Fatal(err.Error())
+		}
+		// All Users
+		restrictedUsersInLDAP = searchResult.Entries
+	}
 
 	// Search for teams (subgroups) in LDAP
 	searchRequest = ldap.NewSearchRequest(
@@ -105,8 +150,10 @@ func (c *LDAP) getLDAPDirectory() *Directory {
 	organizationsInLDAP := difference(allGroupsInLDAP, teamsInLDAP)
 
 	orgs := make(map[string]*LDAPOrganization)
+	users := make(map[string]*LDAPUser)
 	dir := Directory{
 		Organizations: orgs,
+		Users:         users,
 	}
 
 	for _, o := range organizationsInLDAP {
@@ -146,6 +193,37 @@ func (c *LDAP) getLDAPDirectory() *Directory {
 					Users: users,
 				}
 			}
+		}
+	}
+
+	for _, u := range usersInLDAP {
+		restricted := false
+		admin := false
+		if len(c.RestrictedFilter) > 0 {
+			rstUsers := make([]string, len(restrictedUsersInLDAP))
+			for i, v := range restrictedUsersInLDAP {
+				rstUsers[i] = v.GetAttributeValue("cn")
+			}
+			if contains(rstUsers, u.GetAttributeValue("cn")) {
+				restricted = true
+			}
+		}
+
+		if len(c.AdminFilter) > 0 {
+			admUsers := make([]string, len(adminUsersInLDAP))
+			for i, v := range adminUsersInLDAP {
+				admUsers[i] = v.GetAttributeValue("cn")
+			}
+			if contains(admUsers, u.GetAttributeValue("cn")) {
+				admin = true
+			}
+		}
+
+		dir.Users[u.GetAttributeValue("cn")] = &LDAPUser{
+			Name:       u.GetAttributeValue("cn"),
+			Entry:      u,
+			Restricted: OptionalBool(restricted),
+			Admin:      OptionalBool(admin),
 		}
 	}
 

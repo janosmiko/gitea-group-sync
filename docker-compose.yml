@@ -1,9 +1,9 @@
 version: '3'
 services:
   group-sync:
-    container_name: gitea-group-sync
+    container_name: gitea-ldap-sync
     build: .
-    image: ghcr.io/janosmiko/gitea-group-sync
+    image: ghcr.io/janosmiko/gitea-ldap-sync
     environment:
       DEBUG: "false"
       GITEA_TOKEN: 123456789
@@ -24,4 +24,4 @@ services:
       SYNC_CONFIG_CREATE_GROUPS: "true"
       SYNC_CONFIG_FULL_SYNC: "true"
 #    volumes:
-#      - ./config.yaml:/etc/gitea-group-sync/config.yaml
+#      - ./config.yaml:/etc/gitea-ldap-sync/config.yaml
