@@ -37,12 +37,17 @@ ldap:
   # These groups will be mapped as Organizations in Gitea
   group_search_base: 'ou=groups,DC=ldap,DC=example,DC=com'
   group_filter: '(&(objectClass=group))'
+  group_name_attribute: 'cn'
+  group_fullname_attribute: 'cn'
+  group_description_attribute: 'cn'
 
   # These groups will be mapped as Teams in Gitea
   # In this example all groups, which has a memberOf attribute will be determined as subgroups, because they are member
   # of some other groups.
   subgroup_search_base: 'ou=groups,DC=ldap,DC=example,DC=com'
   subgroup_filter: '(&(objectClass=group)(memberOf=*))'
+  subgroup_name_attribute: 'cn'
+  subgroup_description_attribute: 'cn'
 
   # List of groups which will be excluded from the sync. (Gitea Organizations)
   exclude_groups:

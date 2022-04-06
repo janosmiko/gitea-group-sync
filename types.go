@@ -92,10 +92,17 @@ type LDAP struct {
 	AdminFilter      string `mapstructure:"admin_filter"`
 	RestrictedFilter string `mapstructure:"restricted_filter"`
 
-	GroupSearchBase       string   `mapstructure:"group_search_base"`
-	GroupFilter           string   `mapstructure:"group_filter"`
-	SubGroupSearchBase    string   `mapstructure:"subgroup_search_base"`
-	SubGroupFilter        string   `mapstructure:"subgroup_filter"`
+	GroupSearchBase           string `mapstructure:"group_search_base"`
+	GroupFilter               string `mapstructure:"group_filter"`
+	GroupNameAttribute        string `mapstructure:"group_name_attribute"`
+	GroupFullNameAttribute    string `mapstructure:"group_fullname_attribute"`
+	GroupDescriptionAttribute string `mapstructure:"group_description_attribute"`
+
+	SubGroupSearchBase           string `mapstructure:"subgroup_search_base"`
+	SubGroupFilter               string `mapstructure:"subgroup_filter"`
+	SubgroupNameAttribute        string `mapstructure:"subgroup_name_attribute"`
+	SubgroupDescriptionAttribute string `mapstructure:"subgroup_description_attribute"`
+
 	ExcludeGroups         []string `mapstructure:"exclude_groups"`
 	ExcludeGroupsRegex    string   `mapstructure:"exclude_groups_regex"`
 	ExcludeSubgroups      []string `mapstructure:"exclude_subgroups"`

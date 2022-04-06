@@ -87,7 +87,7 @@ func (c *GiteaClient) CreateOrganization(o GiteaOrganization) error {
 	if !exist {
 		zap.S().Infof(`Creating organization: "%v".`, o.UserName)
 		opts := gitea.CreateOrgOption{
-			Name:                      o.Description,
+			Name:                      o.UserName,
 			FullName:                  o.FullName,
 			Description:               o.Description,
 			Website:                   o.Website,

@@ -42,43 +42,48 @@ Variables.
 
 Available Environment Variables (find example values in [config.yaml.sample](config.yaml.sample)):
 
-| Variable                             | Description                                                   | Default            |
-|--------------------------------------|---------------------------------------------------------------|--------------------|
-| `DEBUG`                              | Enable debug mode                                             | `false`            |
-| `GITEA_BASE_URL`                     | Gitea baseURL in `https://user@gitea.com` format.             | `""`               |
-| `GITEA_TOKEN`                        | Gitea admin user token                                        | `""`               |
-| `LDAP_URL`                           | LDAP connection URL                                           | `""`               |
-| `LDAP_PORT`                          | LDAP connection port                                          | `389`              |
-| `LDAP_USE_TLS`                       | Enable TLS connection for LDAP                                | `true`             |
-| `LDAP_ALLOW_INSECURE_TLS`            | Allow insecure TLS connections (disable cert verification)    | `false`            |
-| `LDAP_BIND_DN`                       | LDAP Bind DN (or username)                                    | `""`               |
-| `LDAP_BIND_PASSWORD`                 | LDAP Bind Password                                            | `""`               |
-| `LDAP_USER_SEARCH_BASE`              | LDAP User Search Base                                         | `""`               |
-| `LDAP_USER_FILTER`                   | LDAP User Filter                                              | `""`               |
-| `LDAP_USER_USERNAME_ATTRIBUTE`       | LDAP attribute for Gitea User Username                        | `"sAMAccountName"` |
-| `LDAP_USER_FULLNAME_ATTRIBUTE`       | LDAP attribute for Gitea User Fullname                        | `"cn"`             |
-| `LDAP_USER_FIRST_NAME_ATTRIBUTE`     | LDAP attribute for Gitea User First Name (first + sur = full) | `""`               |
-| `LDAP_USER_SURNAME_ATTRIBUTE`        | LDAP attribute for Gitea User Surname                         | `""`               |
-| `LDAP_USER_EMAIL_ATTRIBUTE`          | LDAP attribute for Gitea User Email                           | `"mail"`           |
-| `LDAP_USER_PUBLIC_SSH_KEY_ATTRIBUTE` | LDAP attribute for Gitea User SSH Key                         | `"sshPublicKey"`   |
-| `LDAP_USER_AVATAR_ATTRIBUTE`         | LDAP attribute for Gitea User Avatar                          | `"avatar"`         |
-| `LDAP_EXCLUDED_USERS`                | Exclude users from sync (separated by whitespace)             | `"root"`           |
-| `LDAP_EXCLUDED_USERS_REGEX`          | Exclude users from sync (regular expression)                  | `""`               |
-| `LDAP_ADMIN_FILTER`                  | LDAP attribute for Gitea User Avatar                          | `""`               |
-| `LDAP_RESTRICTED_FILTER`             | LDAP attribute for Gitea User Avatar                          | `""`               |
-| `LDAP_GROUP_SEARCH_BASE`             | LDAP Group Search Base (Gitea Organizations)                  | `""`               |
-| `LDAP_GROUP_FILTER`                  | LDAP Group Filter                                             | `""`               |
-| `LDAP_SUBGROUP_SEARCH_BASE`          | LDAP Subgroup Search Base (Gitea Teams)                       | `""`               |
-| `LDAP_SUBGROUP_FILTER`               | LDAP Subgroup filter                                          | `""`               |
-| `LDAP_EXCLUDE_GROUPS`                | Exclude groups from sync (separated by whitespace)            | `""`               |
-| `LDAP_EXCLUDE_GROUPS_REGEX`          | Exclude groups from sync (regular expression)                 | `""`               |
-| `LDAP_EXCLUDE_SUBGROUPS`             | Exclude subgroups from sync (separated by whitespace)         | `""`               |
-| `LDAP_EXCLUDE_SUBGROUPS_REGEX`       | Exclude groups from sync (regular expression)                 | `""`               |
-| `LDAP_TRIM_PARENT_NAME`              | Trim parent name from subgroup name                           | `false`            |
-| `LDAP_SUBGROUP_SEPARATOR`            | Trim parent name from subgroup name by this separator         | `"/"`              |
-| `CRON_TIMER`                         | Configure the schedule of the sync (cron format)              | `"@every 1m"`      |
-| `SYNC_CONFIG_CREATE_GROUPS`          | Create non-existing groups in Gitea.                          | `true`             |
-| `SYNC_CONFIG_FULL_SYNC`              | Delete groups from Gitea if they are not existing in LDAP     | `false`            |
+| Variable                              | Description                                                   | Default            |
+|---------------------------------------|---------------------------------------------------------------|--------------------|
+| `DEBUG`                               | Enable debug mode                                             | `false`            |
+| `GITEA_BASE_URL`                      | Gitea baseURL in `https://user@gitea.com` format.             | `""`               |
+| `GITEA_TOKEN`                         | Gitea admin user token                                        | `""`               |
+| `LDAP_URL`                            | LDAP connection URL                                           | `""`               |
+| `LDAP_PORT`                           | LDAP connection port                                          | `389`              |
+| `LDAP_USE_TLS`                        | Enable TLS connection for LDAP                                | `true`             |
+| `LDAP_ALLOW_INSECURE_TLS`             | Allow insecure TLS connections (disable cert verification)    | `false`            |
+| `LDAP_BIND_DN`                        | LDAP Bind DN (or username)                                    | `""`               |
+| `LDAP_BIND_PASSWORD`                  | LDAP Bind Password                                            | `""`               |
+| `LDAP_USER_SEARCH_BASE`               | LDAP User Search Base                                         | `""`               |
+| `LDAP_USER_FILTER`                    | LDAP User Filter                                              | `""`               |
+| `LDAP_USER_USERNAME_ATTRIBUTE`        | LDAP attribute for Gitea User Username                        | `"sAMAccountName"` |
+| `LDAP_USER_FULLNAME_ATTRIBUTE`        | LDAP attribute for Gitea User Fullname                        | `"cn"`             |
+| `LDAP_USER_FIRST_NAME_ATTRIBUTE`      | LDAP attribute for Gitea User First Name (first + sur = full) | `""`               |
+| `LDAP_USER_SURNAME_ATTRIBUTE`         | LDAP attribute for Gitea User Surname                         | `""`               |
+| `LDAP_USER_EMAIL_ATTRIBUTE`           | LDAP attribute for Gitea User Email                           | `"mail"`           |
+| `LDAP_USER_PUBLIC_SSH_KEY_ATTRIBUTE`  | LDAP attribute for Gitea User SSH Key                         | `"sshPublicKey"`   |
+| `LDAP_USER_AVATAR_ATTRIBUTE`          | LDAP attribute for Gitea User Avatar                          | `"avatar"`         |
+| `LDAP_EXCLUDED_USERS`                 | Exclude users from sync (separated by whitespace)             | `"root"`           |
+| `LDAP_EXCLUDED_USERS_REGEX`           | Exclude users from sync (regular expression)                  | `""`               |
+| `LDAP_ADMIN_FILTER`                   | LDAP attribute for Gitea User Avatar                          | `""`               |
+| `LDAP_RESTRICTED_FILTER`              | LDAP attribute for Gitea User Avatar                          | `""`               |
+| `LDAP_GROUP_SEARCH_BASE`              | LDAP Group Search Base (Gitea Organizations)                  | `""`               |
+| `LDAP_GROUP_FILTER`                   | LDAP Group Filter                                             | `""`               |
+| `LDAP_GROUP_NAME_ATTRIBUTE`           | LDAP attribute for Gitea Organization Name                    | `"cn"`             |
+| `LDAP_GROUP_FULLNAME_ATTRIBUTE`       | LDAP attribute for Gitea Organization Fullname                | `"cn"`             |
+| `LDAP_GROUP_DESCRIPTION_ATTRIBUTE`    | LDAP attribute for Gitea Organization Description             | `"cn"`             |
+| `LDAP_SUBGROUP_SEARCH_BASE`           | LDAP Subgroup Search Base (Gitea Teams)                       | `""`               |
+| `LDAP_SUBGROUP_FILTER`                | LDAP Subgroup filter                                          | `""`               |
+| `LDAP_SUBGROUP_NAME_ATTRIBUTE`        | LDAP attribute for Gitea Team Name                            | `"cn"`             |
+| `LDAP_SUBGROUP_DESCRIPTION_ATTRIBUTE` | LDAP attribute for Gitea Team Description                     | `"cn"`             |
+| `LDAP_EXCLUDE_GROUPS`                 | Exclude groups from sync (separated by whitespace)            | `""`               |
+| `LDAP_EXCLUDE_GROUPS_REGEX`           | Exclude groups from sync (regular expression)                 | `""`               |
+| `LDAP_EXCLUDE_SUBGROUPS`              | Exclude subgroups from sync (separated by whitespace)         | `""`               |
+| `LDAP_EXCLUDE_SUBGROUPS_REGEX`        | Exclude groups from sync (regular expression)                 | `""`               |
+| `LDAP_TRIM_PARENT_NAME`               | Trim parent name from subgroup name                           | `false`            |
+| `LDAP_SUBGROUP_SEPARATOR`             | Trim parent name from subgroup name by this separator         | `"/"`              |
+| `CRON_TIMER`                          | Configure the schedule of the sync (cron format)              | `"@every 1m"`      |
+| `SYNC_CONFIG_CREATE_GROUPS`           | Create non-existing groups in Gitea.                          | `true`             |
+| `SYNC_CONFIG_FULL_SYNC`               | Delete groups from Gitea if they are not existing in LDAP     | `false`            |
 
 
 Additional settings for creating Organizations and Teams in Gitea:

@@ -37,6 +37,11 @@ func initConfig() (*Config, error) {
 	viper.SetDefault("ldap.admin_filter", "")
 	viper.SetDefault("ldap.restricted_filter", "")
 	viper.SetDefault("ldap.trim_parent_name", false)
+	viper.SetDefault("ldap.group_name_attribute", "cn")
+	viper.SetDefault("ldap.group_fullname_attribute", "cn")
+	viper.SetDefault("ldap.group_description_attribute", "cn")
+	viper.SetDefault("ldap.subgroup_name_attribute", "cn")
+	viper.SetDefault("ldap.subgroup_description_attribute", "cn")
 	viper.SetDefault("ldap.subgroup_separator", "/")
 	viper.SetDefault("ldap.exclude_users_regex", "")
 	viper.SetDefault("ldap.exclude_groups_regex", "")
@@ -53,16 +58,8 @@ func initConfig() (*Config, error) {
 	viper.SetDefault("sync_config.defaults.team.includes_all_repositories", false)
 	viper.SetDefault("sync_config.defaults.team.permission", "read")
 	viper.SetDefault(
-		"sync_config.defaults.team.units", `[
-        "repo.code",
-        "repo.issues",
-        "repo.ext_issues",
-        "repo.wiki",
-        "repo.pulls",
-        "repo.releases",
-        "repo.projects",
-        "repo.ext_wiki"
-        ]`,
+		"sync_config.defaults.team.units",
+		`repo.code,repo.issues,repo.ext_issues,repo.wiki,repo.pulls,repo.releases,repo.projects,repo.ext_wiki`,
 	)
 
 	_ = viper.BindEnv("gitea.base_url")
@@ -85,8 +82,13 @@ func initConfig() (*Config, error) {
 	_ = viper.BindEnv("ldap.exclude_users")
 	_ = viper.BindEnv("ldap.group_filter")
 	_ = viper.BindEnv("ldap.group_search_base")
+	_ = viper.BindEnv("ldap.group_name_attribute")
+	_ = viper.BindEnv("ldap.group_fullname_attribute")
+	_ = viper.BindEnv("ldap.group_description_attribute")
 	_ = viper.BindEnv("ldap.subgroup_filter")
 	_ = viper.BindEnv("ldap.subgroup_search_base")
+	_ = viper.BindEnv("ldap.subgroup_name_attribute")
+	_ = viper.BindEnv("ldap.subgroup_description_attribute")
 	_ = viper.BindEnv("ldap.exclude_groups")
 	_ = viper.BindEnv("ldap.exclude_groups_regex")
 	_ = viper.BindEnv("ldap.exclude_subgroups")
@@ -101,10 +103,10 @@ func initConfig() (*Config, error) {
 	_ = viper.BindEnv("sync_config.defaults.user.visibility")
 	_ = viper.BindEnv("sync_config.defaults.organization.repo_admin_change_team_access")
 	_ = viper.BindEnv("sync_config.defaults.organization.visibility")
-	_ = viper.BindEnv("sync_config.team.can_create_org_repo")
-	_ = viper.BindEnv("sync_config.team.includes_all_repositories")
-	_ = viper.BindEnv("sync_config.team.permission")
-	_ = viper.BindEnv("sync_config.team.units")
+	_ = viper.BindEnv("sync_config.defaults.team.can_create_org_repo")
+	_ = viper.BindEnv("sync_config.defaults.team.includes_all_repositories")
+	_ = viper.BindEnv("sync_config.defaults.team.permission")
+	_ = viper.BindEnv("sync_config.defaults.team.units")
 
 	for _, v := range viper.AllKeys() {
 		zap.S().Debug(v, ": ", viper.GetString(v))

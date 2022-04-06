@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -105,6 +106,8 @@ func mainJob() {
 	if err = c.syncGiteaGroupsByLDAP(giteaOrgs, ldapDirectory); err != nil {
 		zap.L().Error(err.Error())
 	}
+
+	zap.L().Info("Main process finished...")
 }
 
 func (c *Config) syncLDAPUsersToGitea(ldapDirectory *Directory, giteaUsers []*gitea.User) error {
@@ -129,7 +132,12 @@ func (c *Config) syncLDAPUsersToGitea(ldapDirectory *Directory, giteaUsers []*gi
 
 		zap.S().Infof(`Syncing LDAP User "%v" to Gitea.`, u.Name)
 
-		if !existInSlice(u.Name, giteaUsers) {
+		exists, err := existInSlice(u.Name, giteaUsers)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
 			zap.S().Infof(`User "%v" does not exist in Gitea, creating...`, u.Name)
 
 			fn := u.GetAttributeValue(viper.GetString("ldap.user_first_name_attribute"))
@@ -155,6 +163,8 @@ func (c *Config) syncLDAPUsersToGitea(ldapDirectory *Directory, giteaUsers []*gi
 			if err := c.GiteaClient.CreateUser(user); err != nil {
 				return err
 			}
+		} else {
+			zap.S().Infof(`User "%v" already exist in Gitea...`, u.Name)
 		}
 	}
 
@@ -188,16 +198,27 @@ func (c *Config) syncLDAPGroupsToGitea(ldapDirectory *Directory, giteaOrganizati
 
 		zap.S().Infof(`Syncing LDAP Group "%v" to Gitea as an Organization.`, o.Name)
 
-		if !existInSlice(o.Name, giteaOrganizations) {
+		exists, err := existInSlice(o.Name, giteaOrganizations)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
 			zap.S().Infof(`Group "%v" does not exist in Gitea, creating...`, o.Name)
 			org := GiteaOrganization{
 				Organization: &gitea.Organization{
 					UserName:    o.Name,
-					FullName:    o.Name,
-					Description: o.Name,
-					Visibility:  "private",
+					FullName:    o.GetAttributeValue(viper.GetString("ldap.group_fullname_attribute")),
+					Description: o.GetAttributeValue(viper.GetString("ldap.group_description_attribute")),
+					Visibility:  viper.GetString("sync_config.defaults.organization.visibility"),
 				},
 			}
+			zap.S().Infof(
+				`Organization name: "%v", full name: "%v", description: "%v"`, org.UserName,
+				org.FullName,
+				org.Description,
+			)
+
 			if err := c.GiteaClient.CreateOrganization(org); err != nil {
 				return err
 			}
@@ -226,12 +247,18 @@ func (c *Config) syncLDAPGroupsToGitea(ldapDirectory *Directory, giteaOrganizati
 				continue
 			}
 			zap.S().Infof(`Syncing LDAP Subgroup "%v" to Gitea as a Team.`, t.Name)
-			if !existInSlice(t.Name, giteaTeams) {
+
+			exists, err = existInSlice(t.Name, giteaTeams)
+			if err != nil {
+				return err
+			}
+
+			if !exists {
 				zap.S().Infof(`Team "%v" does not exist in Gitea, creating...`, t.Name)
 				team := GiteaTeam{
 					Team: &gitea.Team{
 						Name:        t.Name,
-						Description: t.Name,
+						Description: t.GetAttributeValue(viper.GetString("ldap.subgroup_description_attribute")),
 					},
 				}
 				opts := GiteaCreateTeamOpts{
@@ -241,6 +268,8 @@ func (c *Config) syncLDAPGroupsToGitea(ldapDirectory *Directory, giteaOrganizati
 					Units:                   c.SyncConfig.Defaults.Team.Units,
 					// UnitsMap:                c.SyncConfig.Defaults.Team.UnitsMap,
 				}
+
+				zap.S().Infof(`Team name: "%v", description: "%v"`, team.Name, team.Description)
 				if err = c.GiteaClient.CreateTeam(o.Name, team, opts); err != nil {
 					return err
 				}
@@ -257,7 +286,7 @@ func (c *Config) syncGiteaUsersByLDAP(giteaUsers []*gitea.User, ldapDirectory *D
 	zap.L().Info("Syncing Users in Gitea.")
 
 	for _, u := range giteaUsers {
-		zap.S().Infof("Begin user review: UserName: %v", u.UserName)
+		zap.S().Infof("Begin user review: %v", u.UserName)
 
 		if len(c.LDAP.ExcludeUsersRegex) > 0 {
 			r := regexp.MustCompile(c.LDAP.ExcludeUsersRegex)
@@ -400,7 +429,12 @@ func (c *Config) syncGiteaGroupsByLDAP(
 				}
 
 				for _, v := range accountsInGitea {
-					if !existInSlice(v.Login, team.Users) {
+					exists, err := existInSlice(v.Login, team.Users)
+					if err != nil {
+						return err
+					}
+
+					if !exists {
 						delUserFromTeamList = append(delUserFromTeamList, v)
 					}
 				}
@@ -441,35 +475,60 @@ func difference(a, b []*ldap.Entry) []*ldap.Entry {
 	return diff
 }
 
-func existInSlice(s string, slice interface{}) bool {
+func existInSlice(s string, slice interface{}) (bool, error) {
 	switch t := slice.(type) {
 	case []GiteaOrganization:
 		for _, v := range t {
 			if v.UserName == s {
-				return true
+				return true, nil
 			}
 		}
+		return false, nil
+	case []*gitea.Organization:
+		for _, v := range t {
+			if v.UserName == s {
+				return true, nil
+			}
+		}
+		return false, nil
 	case []GiteaTeam:
 		for _, v := range t {
 			if v.Name == s {
-				return true
+				return true, nil
 			}
 		}
+		return false, nil
+	case []*gitea.Team:
+		for _, v := range t {
+			if v.Name == s {
+				return true, nil
+			}
+		}
+		return false, nil
 	case map[string]*LDAPUser:
 		for _, v := range t {
 			if v.Name == s {
-				return true
+				return true, nil
 			}
 		}
+		return false, nil
 	case map[string]*gitea.User:
 		for _, v := range t {
 			if v.UserName == s {
-				return true
+				return true, nil
 			}
 		}
+		return false, nil
+	case []*gitea.User:
+		for _, v := range t {
+			if v.UserName == s {
+				return true, nil
+			}
+		}
+		return false, nil
 	}
 
-	return false
+	return false, errors.New("unknown type")
 }
 
 func contains(s []string, searchterm string) bool {

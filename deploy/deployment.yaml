@@ -66,10 +66,20 @@ spec:
               value: 'ou=groups,DC=ldap,DC=example,DC=com'
             - name: LDAP_GROUP_FILTER
               value: '(&(objectClass=group))'
+            - name: LDAP_GROUP_NAME_ATTRIBUTE
+              value: 'cn'
+            - name: LDAP_GROUP_FULLNAME_ATTRIBUTE
+              value: 'cn'
+            - name: LDAP_GROUP_DESCRIPTION_ATTRIBUTE
+              value: 'cn'
             - name: LDAP_SUBGROUP_SEARCH_BASE
               value: 'ou=groups,DC=ldap,DC=example,DC=com'
             - name: LDAP_SUBGROUP_FILTER
               value: '(&(objectClass=group)(memberOf=*))'
+            - name: LDAP_SUBGROUP_NAME_ATTRIBUTE
+              value: 'cn'
+            - name: LDAP_SUBGROUP_DESCRIPTION_ATTRIBUTE
+              value: 'cn'
             - name: LDAP_EXCLUDE_USERS
               value: 'root'
             - name: LDAP_EXCLUDE_USERS_REGEX

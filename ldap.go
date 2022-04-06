@@ -159,35 +159,37 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 	for _, o := range organizationsInLDAP {
 		teams := make(map[string]*LDAPTeam)
 
-		dir.Organizations[o.GetAttributeValue("cn")] = &LDAPOrganization{
-			Name:  o.GetAttributeValue("cn"),
+		dir.Organizations[o.GetAttributeValue(viper.GetString("ldap.group_name_attribute"))] = &LDAPOrganization{
+			Name:  o.GetAttributeValue(viper.GetString("ldap.group_name_attribute")),
 			Entry: o,
 			Teams: teams,
 		}
 
 		for _, t := range teamsInLDAP {
+			n := t.GetAttributeValue("memberOf")
+			_ = n
 			if strings.EqualFold(t.GetAttributeValue("memberOf"), o.DN) {
 				users := make(map[string]*LDAPUser)
 				for _, u := range t.GetAttributeValues("member") {
 					for _, v := range usersInLDAP {
 						if strings.EqualFold(u, v.DN) {
 							user := LDAPUser{
-								Name:  v.GetAttributeValue("cn"),
+								Name:  v.GetAttributeValue(viper.GetString("ldap.user_username_attribute")),
 								Entry: v,
 							}
-							users[v.GetAttributeValue("cn")] = &user
+							users[v.GetAttributeValue(viper.GetString("ldap.user_username_attribute"))] = &user
 						}
 					}
 				}
 
-				name := t.GetAttributeValue("cn")
+				name := t.GetAttributeValue(viper.GetString("ldap.subgroup_name_attribute"))
 
 				if viper.GetBool("ldap.trim_parent_name") {
 					sep := viper.GetString("ldap.subgroup_separator")
 					name = name[strings.Index(name, sep)+len(sep):]
 				}
 
-				dir.Organizations[o.GetAttributeValue("cn")].Teams[name] = &LDAPTeam{
+				dir.Organizations[o.GetAttributeValue(viper.GetString("ldap.group_name_attribute"))].Teams[name] = &LDAPTeam{
 					Name:  name,
 					Entry: t,
 					Users: users,
@@ -202,9 +204,9 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 		if len(c.RestrictedFilter) > 0 {
 			rstUsers := make([]string, len(restrictedUsersInLDAP))
 			for i, v := range restrictedUsersInLDAP {
-				rstUsers[i] = v.GetAttributeValue("cn")
+				rstUsers[i] = v.GetAttributeValue(viper.GetString("ldap.user_username_attribute"))
 			}
-			if contains(rstUsers, u.GetAttributeValue("cn")) {
+			if contains(rstUsers, u.GetAttributeValue(viper.GetString("ldap.user_username_attribute"))) {
 				restricted = true
 			}
 		}
@@ -212,15 +214,15 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 		if len(c.AdminFilter) > 0 {
 			admUsers := make([]string, len(adminUsersInLDAP))
 			for i, v := range adminUsersInLDAP {
-				admUsers[i] = v.GetAttributeValue("cn")
+				admUsers[i] = v.GetAttributeValue(viper.GetString("ldap.user_username_attribute"))
 			}
-			if contains(admUsers, u.GetAttributeValue("cn")) {
+			if contains(admUsers, u.GetAttributeValue(viper.GetString("ldap.user_username_attribute"))) {
 				admin = true
 			}
 		}
 
-		dir.Users[u.GetAttributeValue("cn")] = &LDAPUser{
-			Name:       u.GetAttributeValue("cn"),
+		dir.Users[u.GetAttributeValue(viper.GetString("ldap.user_username_attribute"))] = &LDAPUser{
+			Name:       u.GetAttributeValue(viper.GetString("ldap.user_username_attribute")),
 			Entry:      u,
 			Restricted: OptionalBool(restricted),
 			Admin:      OptionalBool(admin),
