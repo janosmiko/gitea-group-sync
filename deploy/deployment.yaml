@@ -93,7 +93,7 @@ spec:
             - name: LDAP_EXCLUDE_SUBGROUPS_REGEX
               value: ''
             - name: LDAP_TRIM_PARENT_NAME
-              value: "false"
+              value: 'false'
             - name: LDAP_SUBGROUP_SEPARATOR
               value: "/"
             - name: CRON_TIMER

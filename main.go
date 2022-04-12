@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"regexp"
@@ -35,7 +36,11 @@ func main() {
 
 	mainJob() // First run for check settings
 
-	c := cron.New()
+	c := cron.New(
+		cron.WithChain(
+			cron.SkipIfStillRunning(cron.VerbosePrintfLogger(log.New(os.Stdout, "cron: ", log.LstdFlags))),
+		),
+	)
 	_, _ = c.AddFunc(viper.GetString("cron_timer"), mainJob)
 	fmt.Println(c.Entries())
 	go c.Start()
@@ -475,7 +480,7 @@ func difference(a, b []*ldap.Entry) []*ldap.Entry {
 	return diff
 }
 
-func existInSlice(s string, slice interface{}) (bool, error) {
+func existInSlice(s string, slice interface{}) (bool, error) { // nolint:gocognit
 	switch t := slice.(type) {
 	case []GiteaOrganization:
 		for _, v := range t {
@@ -528,7 +533,7 @@ func existInSlice(s string, slice interface{}) (bool, error) {
 		return false, nil
 	}
 
-	return false, errors.New("unknown type")
+	return false, errors.New("unknown type") // nolint: goerr113
 }
 
 func contains(s []string, searchterm string) bool {
