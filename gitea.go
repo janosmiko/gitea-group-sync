@@ -198,11 +198,15 @@ func (c *GiteaClient) CreateUser(u GiteaUser) error {
 		LoginName:               u.UserName,
 		Email:                   gitea.OptionalString(u.Email),
 		FullName:                gitea.OptionalString(u.FullName),
-		MaxRepoCreation:         OptionalInt(viper.GetInt("sync_config.defaults.max_repo_creation")),
-		AllowCreateOrganization: gitea.OptionalBool(viper.GetBool("sync_config.defaults.allow_create_organization")),
-		Visibility:              OptionalVisibility(gitea.VisibleType(viper.GetString("sync_config.defaults.visibility"))),
-		Admin:                   OptionalBool(u.IsAdmin),
-		Restricted:              OptionalBool(u.Restricted),
+		MaxRepoCreation:         OptionalInt(viper.GetInt("sync_config.defaults.user.max_repo_creation")),
+		AllowCreateOrganization: gitea.OptionalBool(viper.GetBool("sync_config.defaults.user.allow_create_organization")),
+		Visibility: OptionalVisibility(
+			gitea.VisibleType(
+				viper.GetString("sync_config.defaults.user.visibility"),
+			),
+		),
+		Admin:      OptionalBool(u.IsAdmin),
+		Restricted: OptionalBool(u.Restricted),
 	}
 
 	_, err = c.Client.AdminEditUser(u.UserName, eOpts)
