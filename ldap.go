@@ -49,7 +49,7 @@ func (c *LDAP) initLDAP() {
 	c.Client = l
 }
 
-func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
+func (c *LDAP) getLDAPDirectory() (*Directory, error) { // nolint: gocognit
 	var err error
 	var searchRequest *ldap.SearchRequest
 	var searchResult *ldap.SearchResult
@@ -66,7 +66,7 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 	// make request to ldap server
 	searchResult, err = c.Client.Search(searchRequest)
 	if err != nil {
-		zap.L().Fatal(err.Error())
+		return nil, err
 	}
 	// All Users
 	usersInLDAP := searchResult.Entries
@@ -86,7 +86,7 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 		// make request to ldap server
 		searchResult, err = c.Client.Search(searchRequest)
 		if err != nil {
-			zap.L().Fatal(err.Error())
+			return nil, err
 		}
 		// All Users
 		adminUsersInLDAP = searchResult.Entries
@@ -109,7 +109,7 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 		// make request to ldap server
 		searchResult, err = c.Client.Search(searchRequest)
 		if err != nil {
-			zap.L().Fatal(err.Error())
+			return nil, err
 		}
 		// All Users
 		restrictedUsersInLDAP = searchResult.Entries
@@ -127,7 +127,7 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 	// make request to ldap server
 	searchResult, err = c.Client.Search(searchRequest)
 	if err != nil {
-		zap.L().Fatal(err.Error())
+		return nil, err
 	}
 	teamsInLDAP := searchResult.Entries
 
@@ -143,7 +143,7 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 
 	searchResult, err = c.Client.Search(searchRequest)
 	if err != nil {
-		zap.L().Fatal(err.Error())
+		return nil, err
 	}
 	allGroupsInLDAP := searchResult.Entries
 
@@ -229,5 +229,5 @@ func (c *LDAP) getLDAPDirectory() *Directory { // nolint: gocognit
 		}
 	}
 
-	return &dir
+	return &dir, nil
 }

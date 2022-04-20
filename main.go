@@ -78,12 +78,19 @@ func mainJob() {
 	c.LDAP.initLDAP()
 	defer c.LDAP.closeLDAP()
 
-	ldapDirectory := c.LDAP.getLDAPDirectory()
+	ldapDirectory, err := c.LDAP.getLDAPDirectory()
+	if err != nil {
+		zap.L().Error(err.Error())
+
+		return
+	}
 
 	// Check organizations and teams in Gitea, add users to them.
 	giteaOrgs, err := c.GiteaClient.ListOrganizations()
 	if err != nil {
 		zap.L().Error(err.Error())
+
+		return
 	}
 	zap.S().Infof("%d Organization Groups were found in the LDAP server.", len(ldapDirectory.Organizations))
 	zap.S().Infof("%d Organizations were found in Gitea.", len(giteaOrgs))
@@ -170,6 +177,29 @@ func (c *Config) syncLDAPUsersToGitea(ldapDirectory *Directory, giteaUsers []*gi
 			}
 		} else {
 			zap.S().Infof(`User "%v" already exist in Gitea...`, u.Name)
+			fn := u.GetAttributeValue(viper.GetString("ldap.user_first_name_attribute"))
+			sn := u.GetAttributeValue(viper.GetString("ldap.user_surname_attribute"))
+			fullname := ""
+			if len(fn) > 0 && len(sn) > 0 {
+				fullname = fmt.Sprintf("%v %v", fn, sn)
+			} else {
+				fullname = u.GetAttributeValue(viper.GetString("ldap.user_fullname_attribute"))
+			}
+
+			user := GiteaUser{
+				User: &gitea.User{
+					UserName:   u.GetAttributeValue(viper.GetString("ldap.user_username_attribute")),
+					FullName:   fullname,
+					Email:      u.GetAttributeValue(viper.GetString("ldap.user_email_attribute")),
+					AvatarURL:  u.GetAttributeValue(viper.GetString("ldap.user_avatar_attribute")),
+					IsAdmin:    *u.Admin,
+					Restricted: *u.Restricted,
+					Visibility: gitea.VisibleTypePrivate,
+				},
+			}
+			if err := c.GiteaClient.CreateUser(user); err != nil {
+				return err
+			}
 		}
 	}
 
