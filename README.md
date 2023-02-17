@@ -46,6 +46,7 @@ Available Environment Variables (find example values in [config.yaml.sample](con
 |---------------------------------------|---------------------------------------------------------------|--------------------|
 | `DEBUG`                               | Enable debug mode                                             | `false`            |
 | `GITEA_BASE_URL`                      | Gitea baseURL in `https://user@gitea.com` format.             | `""`               |
+| `GITEA_USER`                          | Gitea admin username                                          | `""`               |
 | `GITEA_TOKEN`                         | Gitea admin user token                                        | `""`               |
 | `LDAP_URL`                            | LDAP connection URL                                           | `""`               |
 | `LDAP_PORT`                           | LDAP connection port                                          | `389`              |

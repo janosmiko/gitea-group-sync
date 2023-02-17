@@ -18,7 +18,7 @@ func NewGiteaClient() (*GiteaClient, error) {
 		return nil, err
 	}
 
-	user := urlpkg.UserPassword("", viper.GetString("GITEA_TOKEN"))
+	user := urlpkg.UserPassword(viper.GetString("GITEA_USER"), viper.GetString("GITEA_TOKEN"))
 	u.User = user
 
 	gtc, err = gitea.NewClient(u.String())

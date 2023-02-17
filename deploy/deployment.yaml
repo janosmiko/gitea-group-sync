@@ -20,6 +20,8 @@ spec:
               value: "true"
             - name: GITEA_BASE_URL
               value: https://user@gitea.example.com
+            - name: GITEA_USER
+              value: ""
             - name: GITEA_TOKEN
               valueFrom:
                 secretKeyRef:
