@@ -1,4 +1,4 @@
-FROM golang:1.17.8-bullseye AS build
+FROM golang:1.23.4-bullseye AS build
 
 WORKDIR /go/src/github.com/janosmiko/gitea-ldap-sync/
 

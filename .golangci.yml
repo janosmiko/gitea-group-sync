@@ -1,10 +1,7 @@
 run:
   concurrency: 8
   tests: true
-  skip-files:
-    - .golangci.yml
   allow-parallel-runners: true
-
 
 linters:
   # please, do not use `enable-all`: it's deprecated and will be removed soon.
@@ -13,13 +10,12 @@ linters:
   enable:
     - asciicheck
     - bodyclose
-    - deadcode
-    - depguard
+#    - depguard
+    - copyloopvar
     - dogsled
     - errcheck
     - exhaustive
-    - exportloopref
-#    - funlen
+    - funlen
     - gochecknoglobals
     - gochecknoinits
     - gocognit
@@ -28,10 +24,9 @@ linters:
     - gocyclo
     - godot
     - godox
-    - goerr113
+    - err113
     - gofmt
     - goimports
-    - gomnd
     - goprintffuncname
     - gosec
     - gosimple
@@ -39,6 +34,7 @@ linters:
     - ineffassign
     - lll
     - misspell
+    - mnd
     - nakedret
     - nestif
     - noctx
@@ -47,14 +43,13 @@ linters:
     - revive
     - rowserrcheck
     - staticcheck
-    - structcheck
     - stylecheck
     - testpackage
     - typecheck
     - unconvert
     - unparam
     - unused
-    - varcheck
+#    - varcheck
     - whitespace
     #    - wsl
     # don't enable:

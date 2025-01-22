@@ -69,6 +69,7 @@ ldap:
   subgroup_separator: "/"
 
 cron_timer: '@every 1m'
+cron_enabled: true
 
 sync_config:
   # If CreateUsers is set to true, the process will create Users in Gitea.
