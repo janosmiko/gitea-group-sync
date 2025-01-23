@@ -4,13 +4,10 @@ run:
   allow-parallel-runners: true
 
 linters:
-  # please, do not use `enable-all`: it's deprecated and will be removed soon.
-  # inverted configuration with `enable-all` and `disable` is not scalable during updates of golangci-lint
   disable-all: true
   enable:
     - asciicheck
     - bodyclose
-#    - depguard
     - copyloopvar
     - dogsled
     - errcheck
@@ -49,29 +46,14 @@ linters:
     - unconvert
     - unparam
     - unused
-#    - varcheck
     - whitespace
-    #    - wsl
-    # don't enable:
-    # bug:
-    # https://github.com/golangci/golangci-lint/issues/967
-    #    - dupl
-    # deprecated
-    #    - scopelint
-    # deprecated
-    #    - golint
-    # deprecated
-    #    - interfacer
-    # deprecated
-    #    - maligned
-
-  #issues:
-  #  exclude-rules:
-  #    - linters:
-  #        - stylecheck
-  #      text: "ST1001:"
+    - wsl
 
 linters-settings:
   wsl:
     allow-separated-leading-comment: true
     allow-trailing-comment: true
+    allow-assign-and-anything: true
+
+  funlen:
+    lines: 100

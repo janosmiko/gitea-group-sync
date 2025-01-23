@@ -23,6 +23,7 @@ func main() {
 	log := log.Logger.With().Str("tag", "[main]").Logger()
 
 	var err error
+
 	conf, err = config.New()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Error")

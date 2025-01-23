@@ -94,9 +94,11 @@ func (c *Client) AddUsersToTeam(users []Account, team int64) error {
 	for i, user := range users {
 		c.log.Debug().Msgf("Processing user: %s", user.FullName)
 
-		foundUsers, _, err := c.client.SearchUsers(gitea.SearchUsersOption{
-			KeyWord: user.FullName,
-		})
+		foundUsers, _, err := c.client.SearchUsers(
+			gitea.SearchUsersOption{
+				KeyWord: user.FullName,
+			},
+		)
 		if err != nil {
 			return errors.Wrapf(err, "searching users: %s", user.FullName)
 		}
@@ -151,15 +153,17 @@ func (c *Client) CreateOrganization(o Organization) error {
 		return nil
 	}
 
-	if _, _, err := c.client.CreateOrg(gitea.CreateOrgOption{
-		Name:                      o.UserName,
-		FullName:                  o.FullName,
-		Description:               o.Description,
-		Website:                   o.Website,
-		Location:                  o.Location,
-		Visibility:                gitea.VisibleType(o.Visibility),
-		RepoAdminChangeTeamAccess: c.config.SyncConfig.Defaults.Organization.RepoAdminChangeTeamAccess,
-	}); err != nil {
+	if _, _, err := c.client.CreateOrg(
+		gitea.CreateOrgOption{
+			Name:                      o.UserName,
+			FullName:                  o.FullName,
+			Description:               o.Description,
+			Website:                   o.Website,
+			Location:                  o.Location,
+			Visibility:                gitea.VisibleType(o.Visibility),
+			RepoAdminChangeTeamAccess: c.config.SyncConfig.Defaults.Organization.RepoAdminChangeTeamAccess,
+		},
+	); err != nil {
 		return errors.Wrapf(err, "failed to create organization: %s", o.UserName)
 	}
 
@@ -226,14 +230,16 @@ func (c *Client) CreateTeam(orgname string, team Team, opts CreateTeamOpts) erro
 
 	c.log.Info().Msgf("Creating team in organization: %s (organization: %s)", team.Name, orgname)
 
-	if _, _, err := c.client.CreateTeam(orgname, gitea.CreateTeamOption{
-		Name:                    team.Name,
-		Description:             team.Description,
-		Permission:              opts.Permission,
-		CanCreateOrgRepo:        opts.CanCreateOrgRepo,
-		IncludesAllRepositories: opts.IncludesAllRepositories,
-		Units:                   opts.Units,
-	}); err != nil {
+	if _, _, err := c.client.CreateTeam(
+		orgname, gitea.CreateTeamOption{
+			Name:                    team.Name,
+			Description:             team.Description,
+			Permission:              opts.Permission,
+			CanCreateOrgRepo:        opts.CanCreateOrgRepo,
+			IncludesAllRepositories: opts.IncludesAllRepositories,
+			Units:                   opts.Units,
+		},
+	); err != nil {
 		return errors.Wrapf(err, "creating team: %s", team.Name)
 	}
 
@@ -295,20 +301,22 @@ func (c *Client) CreateOrUpdateUser(u User) error {
 func (c *Client) updateUser(user User) error {
 	c.log.Debug().Msgf("Updating user: %s", user.UserName)
 
-	if _, err := c.client.AdminEditUser(user.UserName, gitea.EditUserOption{
-		LoginName:               user.UserName,
-		Email:                   ptr.To(user.Email),
-		FullName:                ptr.To(user.FullName),
-		MaxRepoCreation:         ptr.To(c.config.SyncConfig.Defaults.User.MaxRepoCreation),
-		AllowCreateOrganization: ptr.To(c.config.SyncConfig.Defaults.User.AllowCreateOrganization),
-		Visibility: ptr.To(
-			gitea.VisibleType(
-				c.config.SyncConfig.Defaults.User.Visibility,
+	if _, err := c.client.AdminEditUser(
+		user.UserName, gitea.EditUserOption{
+			LoginName:               user.UserName,
+			Email:                   ptr.To(user.Email),
+			FullName:                ptr.To(user.FullName),
+			MaxRepoCreation:         ptr.To(c.config.SyncConfig.Defaults.User.MaxRepoCreation),
+			AllowCreateOrganization: ptr.To(c.config.SyncConfig.Defaults.User.AllowCreateOrganization),
+			Visibility: ptr.To(
+				gitea.VisibleType(
+					c.config.SyncConfig.Defaults.User.Visibility,
+				),
 			),
-		),
-		Admin:      ptr.To(user.IsAdmin),
-		Restricted: ptr.To(user.Restricted),
-	}); err != nil {
+			Admin:      ptr.To(user.IsAdmin),
+			Restricted: ptr.To(user.Restricted),
+		},
+	); err != nil {
 		return errors.Wrapf(err, "updating user: %s", user.UserName)
 	}
 
@@ -326,6 +334,7 @@ func (c *Client) userExists(u User) (bool, error) {
 	}
 
 	exist := false
+
 	for _, user := range users {
 		if user.UserName == u.UserName {
 			exist = true
@@ -338,15 +347,17 @@ func (c *Client) userExists(u User) (bool, error) {
 func (c *Client) createUser(user User) error {
 	c.log.Debug().Msgf("Creating user: %s", user.UserName)
 
-	if _, _, err := c.client.AdminCreateUser(gitea.CreateUserOption{
-		LoginName:          user.UserName,
-		Username:           user.UserName,
-		FullName:           user.FullName,
-		Email:              user.Email,
-		MustChangePassword: ptr.To(false),
-		Visibility:         ptr.To(user.Visibility),
-		SourceID:           c.config.Gitea.AuthSourceID,
-	}); err != nil {
+	if _, _, err := c.client.AdminCreateUser(
+		gitea.CreateUserOption{
+			LoginName:          user.UserName,
+			Username:           user.UserName,
+			FullName:           user.FullName,
+			Email:              user.Email,
+			MustChangePassword: ptr.To(false),
+			Visibility:         ptr.To(user.Visibility),
+			SourceID:           c.config.Gitea.AuthSourceID,
+		},
+	); err != nil {
 		if strings.Contains(err.Error(), "already exists") {
 			return nil
 		}

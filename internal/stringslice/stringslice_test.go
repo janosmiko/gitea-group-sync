@@ -11,6 +11,7 @@ func TestContains(t *testing.T) {
 		s          []string
 		searchterm string
 	}
+
 	tests := []struct {
 		name string
 		args args
@@ -57,11 +58,14 @@ func TestContains(t *testing.T) {
 			want: true,
 		},
 	}
+
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := stringslice.Contains(tt.args.s, tt.args.searchterm); got != tt.want {
-				t.Errorf("Contains() = %t, want %t", got, tt.want)
-			}
-		})
+		t.Run(
+			tt.name, func(t *testing.T) {
+				if got := stringslice.Contains(tt.args.s, tt.args.searchterm); got != tt.want {
+					t.Errorf("Contains() = %t, want %t", got, tt.want)
+				}
+			},
+		)
 	}
 }

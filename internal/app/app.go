@@ -397,6 +397,7 @@ func (c *Client) syncGiteaTeamMembers(
 	ldapTeam *ldap.Team, giteaTeam *giteapkg.Team, giteaAccounts map[string]gitea.Account,
 ) error {
 	c.log.Info().Msgf("Checking team in LDAP: %s.", ldapTeam.Name)
+
 	if err := c.addGiteaUsersToTeams(ldapTeam, giteaTeam, giteaAccounts); err != nil {
 		return err
 	}
@@ -482,6 +483,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	case []*gitea.Organization:
 		for _, v := range t {
@@ -489,6 +491,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	case []gitea.Team:
 		for _, v := range t {
@@ -496,6 +499,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	case []*gitea.Team:
 		for _, v := range t {
@@ -503,6 +507,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	case map[string]*ldap.User:
 		for _, v := range t {
@@ -510,6 +515,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	case map[string]*gitea.User:
 		for _, v := range t {
@@ -517,6 +523,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	case []*gitea.User:
 		for _, v := range t {
@@ -524,6 +531,7 @@ func existInSlice(s string, slice interface{}) (bool, error) { //nolint:gocognit
 				return true, nil
 			}
 		}
+
 		return false, nil
 	}
 

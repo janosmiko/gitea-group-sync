@@ -1,0 +1,21 @@
+version: 2
+builds:
+  - binary: gobackup
+    env:
+      - CGO_ENABLED=0
+    ldflags: -s -w -X main.version={{.Version}}
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+archives:
+  - name_template: "{{ .ProjectName }}-{{ .Os }}-{{ .Arch }}"
+    format: tar.gz
+release:
+  prerelease: auto
+  replace_existing_artifacts: true

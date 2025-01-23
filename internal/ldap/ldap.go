@@ -216,10 +216,10 @@ func (c *Client) buildGroups(
 		}
 
 		for _, t := range ldapTeams {
-			n := t.GetAttributeValue("memberOf")
-			_ = n
-			if strings.EqualFold(t.GetAttributeValue("memberOf"), o.DN) {
+			memberOf := t.GetAttributeValue("memberOf")
+			if strings.EqualFold(memberOf, o.DN) {
 				users := make(map[string]*User)
+
 				for _, u := range t.GetAttributeValues("member") {
 					for _, v := range ldapUsers {
 						if strings.EqualFold(u, v.DN) {
@@ -249,14 +249,17 @@ func (c *Client) buildUsers(
 	dir *Directory, ldapUsers []*ldap.Entry, ldapRestrictedUsers []*ldap.Entry, ldapAdminUsers []*ldap.Entry,
 ) {
 	c.log.Debug().Msg("Building ldap users")
+
 	for _, u := range ldapUsers {
 		restricted := false
 		admin := false
+
 		if c.config.LDAP.RestrictedFilter != "" {
 			rstUsers := make([]string, len(ldapRestrictedUsers))
 			for i, v := range ldapRestrictedUsers {
 				rstUsers[i] = v.GetAttributeValue(c.config.LDAP.UserUsernameAttribute)
 			}
+
 			if stringslice.Contains(rstUsers, u.GetAttributeValue(c.config.LDAP.UserUsernameAttribute)) {
 				restricted = true
 			}
@@ -264,9 +267,11 @@ func (c *Client) buildUsers(
 
 		if c.config.LDAP.AdminFilter != "" {
 			admUsers := make([]string, len(ldapAdminUsers))
+
 			for i, v := range ldapAdminUsers {
 				admUsers[i] = v.GetAttributeValue(c.config.LDAP.UserUsernameAttribute)
 			}
+
 			if stringslice.Contains(admUsers, u.GetAttributeValue(c.config.LDAP.UserUsernameAttribute)) {
 				admin = true
 			}
@@ -369,12 +374,15 @@ func difference(a, b []*ldap.Entry) []*ldap.Entry {
 	for _, x := range b {
 		mb[x.GetAttributeValue("cn")] = struct{}{}
 	}
+
 	var diff []*ldap.Entry
+
 	for _, x := range a {
 		if _, found := mb[x.GetAttributeValue("cn")]; !found {
 			diff = append(diff, x)
 		}
 	}
+
 	return diff
 }
 

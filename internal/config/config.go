@@ -234,36 +234,47 @@ func (c *Config) check() error {
 	if c.Gitea.User == "" {
 		missing = append(missing, "GITEA_USER")
 	}
+
 	if c.Gitea.Token == "" {
 		missing = append(missing, "GITEA_TOKEN")
 	}
+
 	if c.Gitea.BaseURL == "" {
 		missing = append(missing, "GITEA_BASE_URL")
 	}
+
 	if c.Gitea.AuthSourceID == 0 {
 		missing = append(missing, "GITEA_AUTH_SOURCE_ID")
 	}
+
 	if c.LDAP.URL == "" {
 		missing = append(missing, "LDAP_URL")
 	}
+
 	if c.LDAP.BindDN == "" && c.LDAP.BindPassword == "" {
 		missing = append(missing, "LDAP_BIND_DN", "LDAP_BIND_PASSWORD")
 	}
+
 	if c.LDAP.UserFilter == "" {
 		missing = append(missing, "LDAP_USER_FILTER")
 	}
+
 	if c.LDAP.UserSearchBase == "" {
 		missing = append(missing, "LDAP_USER_SEARCH_BASE")
 	}
+
 	if c.LDAP.GroupFilter == "" {
 		missing = append(missing, "LDAP_GROUP_FILTER")
 	}
+
 	if c.LDAP.GroupSearchBase == "" {
 		missing = append(missing, "LDAP_GROUP_SEARCH_BASE")
 	}
+
 	if c.LDAP.SubgroupFilter == "" {
 		missing = append(missing, "LDAP_SUBGROUP_FILTER")
 	}
+
 	if c.LDAP.SubgroupSearchBase == "" {
 		missing = append(missing, "LDAP_SUBGROUP_SEARCH_BASE")
 	}

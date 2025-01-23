@@ -10,11 +10,14 @@ COPY . ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-extldflags "-static"' -o gitea-ldap-sync .
 
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 COPY --from=build /go/src/github.com/janosmiko/gitea-ldap-sync/gitea-ldap-sync /usr/bin/gitea-ldap-sync
 
-RUN apt-get update && apt-get install -y ca-certificates \
-    && rm -fr /var/cache/apt/
+RUN <<EOF
+apt-get update
+apt-get install -y --no-install-recommends ca-certificates
+rm -rf /var/lib/apt/lists/*
+EOF
 
 ENTRYPOINT ["/usr/bin/gitea-ldap-sync"]
