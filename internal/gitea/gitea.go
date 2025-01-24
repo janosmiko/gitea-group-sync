@@ -373,6 +373,10 @@ func (c *Client) createUser(user User) error {
 func (c *Client) DeleteUser(username string) error {
 	c.log.Debug().Msgf("Deleting user: %s", username)
 
+	if err := c.RemoveUserFromAllTeams(username); err != nil {
+		return errors.Wrapf(err, "removing user from all teams: %s", username)
+	}
+
 	if _, err := c.client.AdminDeleteUser(username); err != nil {
 		return errors.Wrapf(err, "deleting user: %s", username)
 	}
@@ -380,6 +384,48 @@ func (c *Client) DeleteUser(username string) error {
 	c.log.Info().Msgf("User: %s deleted", username)
 
 	return nil
+}
+
+func (c *Client) RemoveUserFromAllTeams(username string) error {
+	c.log.Debug().Msgf("Removing user from all teams: %s", username)
+
+	orgs, _, err := c.client.ListUserOrgs(username, gitea.ListOrgsOptions{})
+	if err != nil {
+		return errors.Wrapf(err, "listing all orgs for user: %s", username)
+	}
+
+	for _, org := range orgs {
+		teams, _, err := c.client.ListOrgTeams(org.UserName, gitea.ListTeamsOptions{})
+		if err != nil {
+			return errors.Wrapf(err, "listing all teams for org: %s", org.UserName)
+		}
+
+		for _, team := range teams {
+			isTeamMember, err := c.IsTeamMember(username, team.ID)
+			if err != nil {
+				return errors.Wrapf(err, "checking if user is a member of team: %s (team-id: %d)", username, team.ID)
+			}
+
+			if isTeamMember {
+				if _, err := c.client.RemoveTeamMember(team.ID, username); err != nil {
+					return errors.Wrapf(err, "removing user from team: %s (team-id: %d)", username, team.ID)
+				}
+			}
+		}
+	}
+
+	c.log.Info().Msgf("User removed from teams: %s", username)
+
+	return nil
+}
+
+func (c *Client) IsTeamMember(username string, teamID int64) (bool, error) {
+	member, _, err := c.client.GetTeamMember(teamID, username)
+	if err != nil {
+		return false, nil
+	}
+
+	return member != nil, nil
 }
 
 func (c *Client) ListTeamUsers(teamID int64) (map[string]Account, error) {
